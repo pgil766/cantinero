@@ -1,0 +1,6 @@
+# Dependencias de desarrollo y pruebas. Fijar con:
+#   uv pip compile requirements-dev.in -o requirements-dev.txt --python-version 3.12
+-c requirements.txt
+
+pytest
+httpx2

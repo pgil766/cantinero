@@ -1,0 +1,10 @@
+# Dependencias directas del backend. Las versiones exactas se fijan en requirements.txt con:
+#   uv pip compile requirements.in -o requirements.txt --python-version 3.12
+# (se irán agregando las de LangChain/LangGraph, embeddings, loaders y Keycloak en sus fases)
+
+fastapi
+uvicorn[standard]
+pydantic-settings
+sqlalchemy
+psycopg[binary]
+pgvector
