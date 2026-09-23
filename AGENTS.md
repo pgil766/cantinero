@@ -425,7 +425,7 @@ Mínimo **dos** estrategias. Cantinero implementa **las seis** (ver [sección 9]
 | Agente | **LangGraph** + **LangChain** (`langchain-core`, `langchain-ollama`, `langchain-postgres`, `langchain-text-splitters`, `langchain-community`) | Obligatorio (§3.1) |
 | LLM local | **Ollama** + **`qwen2.5:3b`** | Qwen está en la lista del docente (§3.2); buen español; ~2 GB de RAM, cabe en la VM |
 | Embeddings | **Sentence Transformers**: `paraphrase-multilingual-MiniLM-L12-v2` (384 dim) | Recomendado en el Anexo D; multilingüe (dominio en español); liviano en CPU |
-| Base vectorial y datos | **PostgreSQL 16 + pgvector** (imagen `pgvector/pgvector`) | Anexo D; un solo motor para vectores, historial, documentos y Keycloak |
+| Base vectorial y datos | **PostgreSQL 17 + pgvector 0.8.6** (imagen `pgvector/pgvector:0.8.6-pg17`) | Anexo D; un solo motor para vectores, historial, documentos y Keycloak |
 | Autenticación | **Keycloak** (imagen oficial `quay.io/keycloak/keycloak`) | Recomendado por el docente (§2.1 y Anexo D); OIDC estándar |
 | Frontend | **React + Vite + TypeScript** + Tailwind CSS + `keycloak-js` | Anexo D (React); rápido de construir |
 | Reverse proxy / HTTPS | **Caddy** | Certificados HTTPS automáticos (necesarios para Vercel y `keycloak-js`) |
@@ -1092,7 +1092,7 @@ embeddings ≈ 1 GB · Postgres ≈ 0.3 GB · Caddy y SO ≈ 1 GB → **≈ 6 GB
 | `caddy` | `caddy` | **Sí** (80/443) | certificados |
 | `backend` | propia (`backend/Dockerfile`) | No (vía Caddy `/api`) | caché de modelos de embeddings |
 | `keycloak` | `quay.io/keycloak/keycloak` | No (vía Caddy `/auth`) | — (estado en Postgres) |
-| `postgres` | `pgvector/pgvector:pg16` | **No** | **`pgdata` (persistente)** |
+| `postgres` | `pgvector/pgvector:0.8.6-pg17` | **No** | **`pgdata` (persistente)** |
 | `ollama` | `ollama/ollama` | **No** | **`ollama_models` (persistente)** |
 
 - Al iniciar Ollama: `ollama pull qwen2.5:3b` (script de entrada o paso manual documentado).
@@ -1143,12 +1143,12 @@ demo completa.
 
 ### Fase 1 — Infraestructura local y esqueleto del backend
 
-- [ ] **T1.1** — `docker-compose.yml` con `postgres` (pgvector) y `keycloak` (modo desarrollo), más `db/init/` que crea las BD `cantinero` y `keycloak` y la extensión `vector`. ✔ `docker compose up` levanta ambos; consola de Keycloak accesible en local.
-- [ ] **T1.2** — Estructura del backend ([sección 14](#14-estructura-del-repositorio)), entorno con `uv` y `requirements.txt`. ✔ `uvicorn app.main:app` arranca.
-- [ ] **T1.3** — `core/config.py` con `pydantic-settings` (todas las variables de la [15.2](#152-backend)); falla con un mensaje claro si falta alguna. ✔ Prueba de configuración.
-- [ ] **T1.4** — `main.py`: CORS, registro de routers, manejadores de error uniformes y logging. ✔ `/docs` carga en local.
-- [ ] **T1.5** — `db/` y migración SQL de la [10.2](#102-modelo-de-datos-postgresql-base-de-datos-cantinero) aplicada. ✔ Tablas creadas; script versionado.
-- [ ] **T1.6** — `backend/Dockerfile` (Python 3.12 slim y torch CPU) y servicio `backend` en compose. ✔ El contenedor arranca y se conecta a Postgres.
+- [x] **T1.1** — `docker-compose.yml` con `postgres` (pgvector) y `keycloak` (modo desarrollo), más `db/init/` que crea las BD `cantinero` y `keycloak` y la extensión `vector`. ✔ `docker compose up` levanta ambos; consola de Keycloak accesible en local. *(Hecho: Keycloak 26.7.4 y pgvector 0.8.6-pg17; BD `cantinero` y `keycloak` con dueños separados, verificadas.)*
+- [x] **T1.2** — Estructura del backend ([sección 14](#14-estructura-del-repositorio)), entorno con `uv` y `requirements.txt`. ✔ `uvicorn app.main:app` arranca. *(Hecho: versiones fijadas con `uv pip compile` en `requirements.txt` y `requirements-dev.txt`.)*
+- [x] **T1.3** — `core/config.py` con `pydantic-settings` (todas las variables de la [15.2](#152-backend)); falla con un mensaje claro si falta alguna. ✔ Prueba de configuración. *(Hecho: 6 pruebas en `tests/test_config.py`.)*
+- [x] **T1.4** — `main.py`: CORS, registro de routers, manejadores de error uniformes y logging. ✔ `/docs` carga en local. *(Hecho: 7 pruebas en `tests/test_app.py`; se arranca con `uvicorn app.main:create_app --factory`.)*
+- [x] **T1.5** — `db/` y migración SQL de la [10.2](#102-modelo-de-datos-postgresql-base-de-datos-cantinero) aplicada. ✔ Tablas creadas; script versionado. *(Hecho: `migrations/001_init.sql` aplicada con `python -m scripts.migrate`; 4 pruebas de integración sobre una BD temporal.)*
+- [x] **T1.6** — `backend/Dockerfile` (Python 3.12 slim y torch CPU) y servicio `backend` en compose. ✔ El contenedor arranca y se conecta a Postgres. *(Hecho: torch CPU se agrega en la Fase 2; el contenedor aplica las migraciones al iniciar, corre sin root y tiene HEALTHCHECK.)*
 
 ### Fase 2 — Modelo local y embeddings (M4)
 

@@ -51,6 +51,27 @@ Pregunta: *"¿Qué ingredientes lleva un Negroni?"* (temperatura 0.1, sin contex
   descargando `llama3.1:8b` al mismo tiempo. Ollama sí usa la GPU NVIDIA (37/37 capas de qwen en la GPU; llama
   3.9 de 5.2 GB en la GPU). **Repetir las mediciones con el cargador conectado para la T6.4.**
 
+## 2026-09-23 · Problema · Conexiones a "localhost" colgadas en Windows (Fase 1)
+
+- **Qué pasó:** las pruebas de integración se quedaban colgadas más de 3 minutos. Un diagnóstico con
+  `connect_timeout=5` mostró que conectar a `localhost:5432` tardaba 5 s y a `127.0.0.1:5432`, 0.04 s.
+- **Causa:** en Windows, `localhost` resuelve primero a IPv6 (`::1`), pero Docker publica los puertos en
+  `127.0.0.1` (IPv4). Cada conexión espera a que venza el intento por IPv6 antes de probar IPv4.
+- **Solución:** `DATABASE_URL` y `KEYCLOAK_INTERNAL_URL` usan `127.0.0.1`. Se agregó `connect_timeout=10` al
+  motor de SQLAlchemy para que un problema de red falle rápido. `KEYCLOAK_ISSUER` se mantiene con `localhost`
+  porque debe coincidir con la URL que usa el navegador (será la causa de errores 401 si se cambia).
+
+## 2026-09-23 · Decisión · Versiones de infraestructura (Fase 1)
+
+- Keycloak **26.7.4** (`quay.io/keycloak/keycloak`) y pgvector **0.8.6 sobre PostgreSQL 17**
+  (`pgvector/pgvector:0.8.6-pg17`): las últimas estables publicadas al 2026-09-23, fijadas para que el
+  entorno local y la VM sean idénticos.
+- Dependencias de Python fijadas con `uv pip compile` (FastAPI 0.141.1, SQLAlchemy 2.0.54, psycopg 3.3.6,
+  pydantic-settings 2.15.0, pytest 9.1.1). Se usa `httpx2` porque Starlette marcó como obsoleto su
+  `TestClient` con `httpx`.
+- Migraciones: SQL versionado (`backend/migrations/NNN_*.sql`) con un aplicador propio de ~40 líneas en vez
+  de Alembic. Es más simple, transparente y suficiente para el tamaño del proyecto.
+
 ## 2026-09-23 · Nota · Python 3.12 para el proyecto
 
 - El equipo tiene Python 3.13 instalado, pero se usa **Python 3.12** (vía `uv`) en local y en Docker para evitar
