@@ -1,0 +1,42 @@
+# --- Secretos y entorno ---
+.env
+.env.*
+!.env.example
+
+# --- Enunciado del curso (no se publica) ---
+trabajo agente.pdf
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+.vite/
+*.local
+
+# --- Datos generados en tiempo de ejecución ---
+data/uploads/
+backups/
+*.dump
+*.sql.gz
+
+# --- Logs y sistema ---
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editores ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
