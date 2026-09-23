@@ -72,7 +72,7 @@ Estas reglas aplican a cualquier agente de IA (Claude Code, Codex, Cursor, etc.)
    `git diff --staged`.
 8. **Commits pequeños y frecuentes**, con mensajes significativos en formato *Conventional Commits* en
    español: `feat(agent): agregar nodo de validación de contexto`. La rúbrica valora "commits frecuentes".
-   Los dos integrantes deben tener commits propios. **Prohibido** agregar firmas o marcas de IA en git:
+   **Prohibido** agregar firmas o marcas de IA en git:
    nada de `Co-Authored-By: Claude …`, "Generated with …" ni similares en commits o PRs.
 9. **No inventes APIs.** LangChain, LangGraph, Keycloak y `keycloak-js` cambian seguido (nombres de
    variables de entorno, *flags*, métodos). Antes de usar una clase, función o variable, verifica la
@@ -80,8 +80,8 @@ Estas reglas aplican a cualquier agente de IA (Claude Code, Codex, Cursor, etc.)
    las imágenes de Docker una vez que algo funcione.
 10. **Sin fechas.** El equipo decidió no trabajar con cronograma: el plan se ordena por **fases y
     prioridades**. No agregues fechas ni plazos.
-11. **Sin roles fijos.** Las tareas se reparten sobre la marcha entre Pablo y Emanuel. No asumas que una
-    persona es "la de backend" o "la de frontend".
+11. **Responsable de la ejecución: Pablo.** Pablo lleva adelante todo el desarrollo. Emanuel figura como
+    integrante en los entregables, pero ninguna tarea depende de él.
 12. **Pruebas.** Toda lógica no trivial (chunking, loaders, enrutamiento del grafo, protección de endpoints,
     aislamiento entre usuarios) lleva prueba con `pytest`. Antes de dar algo por terminado, corre las pruebas.
 13. **Entorno Windows.** El equipo desarrolla en Windows 11 con PowerShell. Los comandos documentados deben
@@ -124,7 +124,7 @@ la pregunta de forma explícita.
 
 ### 1.4 Modalidad
 
-En **pareja**: **Pablo Gil** y **Emanuel Quintero**. Sin roles fijos.
+En **pareja**: **Pablo Gil** y **Emanuel Quintero**. Pablo es el responsable de la ejecución del proyecto.
 
 ### 1.5 La frase de rechazo (constante del sistema)
 
@@ -147,7 +147,7 @@ backend y reutilízala.
 | ID | Decisión | Valor | Consecuencias |
 |----|----------|-------|---------------|
 | D1 | Nombre del proyecto | ✅ **Cantinero** | Repositorio `cantinero`, *realm* de Keycloak `cantinero`, marca en la UI |
-| D2 | Integrantes | ✅ **Pablo Gil y Emanuel Quintero** (pareja) | Portada del documento y de las diapositivas; commits de ambos |
+| D2 | Integrantes | ✅ **Pablo Gil y Emanuel Quintero** (pareja); Pablo ejecuta el proyecto | Ambos en la portada del documento y en las diapositivas; ninguna tarea depende de Emanuel |
 | D3 | Tema / dominio | ✅ **Coctelería y destilados** | Ver [sección 3](#3-el-dominio-cantinero) |
 | D4 | Roles | ✅ **Sin roles fijos** | Las tareas se reparten sobre la marcha |
 | D5 | Autenticación | ✅ **Keycloak** (recomendación del docente, §2.1) | Servicio extra en Docker Compose; frontend con `keycloak-js`; backend valida JWT con JWKS |
@@ -1136,8 +1136,8 @@ demo completa.
 
 - [x] **T0.1** — Tomar las decisiones D1–D12. ✔ Tabla de la [sección 2](#2-decisiones-del-equipo) completa.
 - [ ] **T0.2** — Validar el dominio: ampliar las preguntas de la [3.5](#35-preguntas-de-referencia-base-del-set-de-evaluación) a 40+ y confirmar que el material del *seed* las cubre. ✔ `eval/preguntas.yaml` inicial y lista de fuentes. *(Avance: `eval/preguntas.yaml` creado con 54 preguntas (28 dentro del dominio, 10 fuera, 6 sensibles, 5 ambiguas, 2 saludos y 3 de la demo); falta confirmar la cobertura cuando exista el seed, en T3.1.)*
-- [ ] **T0.3** — Instalar en ambos portátiles: **Node.js LTS**, **Ollama**, **Python 3.12** vía `uv` y (opcional) **GitHub CLI**; verificar Docker Desktop. ✔ `node -v`, `ollama -v`, `uv python list` y `docker ps` funcionan. *(Portátil de Pablo: ✅ Node 24.19, Ollama 0.34.3, Python 3.12.14, gh 2.101, Docker 29.7 corriendo. Falta el portátil de Emanuel.)*
-- [x] **T0.4** — Crear el repositorio **`cantinero`** en GitHub (público), agregar a ambos integrantes, `git init`, `.gitignore` (Python, Node, `.env`, `.venv`, `node_modules`, `data/uploads`, `trabajo agente.pdf`), README mínimo, este AGENTS.md y `docs/bitacora.md`. ✔ Primer commit subido. *(Hecho: https://github.com/pgil766/cantinero, público, rama `main`. Pendiente: invitar a Emanuel como colaborador.)*
+- [x] **T0.3** — Instalar **Node.js LTS**, **Ollama**, **Python 3.12** vía `uv` y (opcional) **GitHub CLI**; verificar Docker Desktop. ✔ `node -v`, `ollama -v`, `uv python list` y `docker ps` funcionan. *(Hecho en el portátil de Pablo: Node 24.19, Ollama 0.34.3, Python 3.12.14, gh 2.101, Docker 29.7.)*
+- [x] **T0.4** — Crear el repositorio **`cantinero`** en GitHub (público), `git init`, `.gitignore` (Python, Node, `.env`, `.venv`, `node_modules`, `data/uploads`, `trabajo agente.pdf`), README mínimo, este AGENTS.md y `docs/bitacora.md`. ✔ Primer commit subido. *(Hecho: https://github.com/pgil766/cantinero, público, rama `main`.)*
 - [x] **T0.5** — Activar **Azure for Students** con el correo institucional (puede tardar; hacerlo ya). ✔ Suscripción activa con crédito. *(Hecho: cuenta de Pablo con USD 100 de crédito. Cuidar el gasto: apagar la VM cuando no se use y configurar el auto-shutdown.)*
 - [ ] **T0.6** — `ollama pull qwen2.5:3b` y `ollama pull llama3.1:8b` (este último solo para comparar); prueba rápida en español. ✔ Ambos responden en local.
 
@@ -1182,7 +1182,7 @@ demo completa.
 
 ### Fase 5 — Agente LangGraph (M3, M6, M7)
 
-- [ ] **T5.1** — `agents/state.py`, constantes `REJECTION_MESSAGE` y `RESPONSIBLE_MESSAGE`, y `agents/prompts.py` (generación, intención con ejemplos del dominio, validador y verificador). ✔ Revisados por ambos integrantes.
+- [ ] **T5.1** — `agents/state.py`, constantes `REJECTION_MESSAGE` y `RESPONSIBLE_MESSAGE`, y `agents/prompts.py` (generación, intención con ejemplos del dominio, validador y verificador). ✔ Revisados por Pablo.
 - [ ] **T5.2** — Nodos de la [8.2](#82-nodos-mapeo-al-flujo-de-31-y-al-anexo-b). ✔ Prueba unitaria por nodo con LLM y *retriever* falsos.
 - [ ] **T5.3** — `agents/graph.py`: `build_graph(...)` con las aristas condicionales de la [8.3](#83-grafo). ✔ Pruebas de enrutamiento: saludo → `greet`; sensible → `responsible_notice` (sin recuperación); sin contexto → `reject`; con contexto → `generate_answer`; no soportada → `reject`; todas las ramas pasan por `save_history`.
 - [ ] **T5.4** — **Calibrar `SIMILARITY_THRESHOLD`** ([9.1](#91-calibración-del-umbral-obligatoria-t54)). ✔ Tabla o gráfica en `docs/evaluacion.md` y valor en `.env.example`.
@@ -1230,7 +1230,7 @@ demo completa.
 - [ ] **T9.3** — Capturas: portada, registro en Keycloak, chat con respuesta y fuentes, rechazo, consumo responsable, subida de documento y lista de documentos.
 - [ ] **T9.4** — Documento técnico en PDF con las **14 secciones** ([19.1](#191-documento-técnico-pdf--14-apartados-obligatorios)).
 - [ ] **T9.5** — Diapositivas en PDF, **8 a 12 láminas**, en el orden obligatorio ([19.2](#192-diapositivas-pdf--8-a-12-láminas-en-este-orden)).
-- [ ] **T9.6** — Ensayar la sustentación con cronómetro, **7 a 10 minutos** ([19.3](#193-sustentación-7-a-10-minutos-demo-en-vivo)), repartiendo la presentación entre ambos.
+- [ ] **T9.6** — Ensayar la sustentación con cronómetro, **7 a 10 minutos** ([19.3](#193-sustentación-7-a-10-minutos-demo-en-vivo)).
 - [ ] **T9.7** — Revisión final contra el [checklist maestro](#22-checklist-maestro).
 
 ### Fase 10 — Extras opcionales *(solo con M1–M8 listos y desplegados)*
@@ -1362,7 +1362,7 @@ modelos, despliegue en Azure.)
 
 ### 19.3 Sustentación (7 a 10 minutos, demo en vivo)
 
-La demo **debe cubrir** cada punto de §5.3. Guion sugerido (repartido entre Pablo y Emanuel):
+La demo **debe cubrir** cada punto de §5.3. Guion sugerido:
 
 | Min. | Bloque | Qué mostrar | Requisito §5.3 |
 |------|--------|-------------|----------------|
@@ -1424,8 +1424,6 @@ La demo **debe cubrir** cada punto de §5.3. Guion sugerido (repartido entre Pab
 | GPU | ✅ NVIDIA RTX 3050 **6 GB** | Ollama nativo la usa (útil para comparar con `llama3.1:8b`) |
 | RAM | 15.2 GB | Suficiente |
 | Carpeta del proyecto | ✅ `C:\Users\pgilm\Universidad\Implementacion\trabajo_agentes` (fuera de OneDrive) | — |
-
-> El portátil de Emanuel debe revisarse igual (T0.3).
 
 ### 21.2 Arranque local (una vez creado el proyecto)
 
@@ -1552,7 +1550,7 @@ docker compose up --build
 
 ### 22.11 Repositorio (§5.1)
 
-- [ ] `cantinero` público en GitHub · [ ] Commits frecuentes y significativos de **ambos** integrantes
+- [ ] `cantinero` público en GitHub · [ ] Commits frecuentes y significativos
 - [ ] Código del backend y del frontend · [ ] Configuración del agente · [ ] *Realm* de Keycloak
 - [ ] README: ejecución local **y** despliegue · [ ] `.env.example` completo
 - [ ] Capturas de pantalla · [ ] Diagrama de arquitectura · [ ] Diagrama del grafo
