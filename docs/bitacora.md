@@ -36,6 +36,21 @@ Formato de cada entrada: **fecha · tipo (Decisión / Problema / Nota) · descri
 - **Solución:** descarga directa desde `https://ollama.com/download/OllamaSetup.exe` con `curl` (reintentos y
   reanudación), verificación de la firma digital (Ollama Inc.) e instalación. Versión instalada: 0.34.3.
 
+## 2026-09-23 · Nota · Prueba de los modelos sin RAG (evidencia para el documento técnico)
+
+Pregunta: *"¿Qué ingredientes lleva un Negroni?"* (temperatura 0.1, sin contexto).
+
+| Modelo | Respuesta | Correcta | Latencia (con batería) |
+|--------|-----------|----------|------------------------|
+| `qwen2.5:3b` | "gin, ron oscuro y un toque de azúcar… ginebra… ralladura" | ❌ **Alucinación** | 116 s (63 s de carga), 3.2 tokens/s |
+| `llama3.1:8b` | "gin, Campari y sweet vermouth, 1:1:1" | ✅ | 48 s (30 s de carga), 10.9 tokens/s |
+
+- **Conclusión:** el modelo pequeño, usado solo, inventa recetas con total seguridad. Esto justifica la
+  arquitectura RAG y las capas de control de alucinaciones (sección 10 del documento técnico).
+- **Rendimiento:** las cifras están deprimidas. El portátil estaba **con batería** (la RTX 3050 en estado P8) y
+  descargando `llama3.1:8b` al mismo tiempo. Ollama sí usa la GPU NVIDIA (37/37 capas de qwen en la GPU; llama
+  3.9 de 5.2 GB en la GPU). **Repetir las mediciones con el cargador conectado para la T6.4.**
+
 ## 2026-09-23 · Nota · Python 3.12 para el proyecto
 
 - El equipo tiene Python 3.13 instalado, pero se usa **Python 3.12** (vía `uv`) en local y en Docker para evitar

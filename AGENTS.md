@@ -1135,11 +1135,11 @@ demo completa.
 ### Fase 0 — Preparación
 
 - [x] **T0.1** — Tomar las decisiones D1–D12. ✔ Tabla de la [sección 2](#2-decisiones-del-equipo) completa.
-- [ ] **T0.2** — Validar el dominio: ampliar las preguntas de la [3.5](#35-preguntas-de-referencia-base-del-set-de-evaluación) a 40+ y confirmar que el material del *seed* las cubre. ✔ `eval/preguntas.yaml` inicial y lista de fuentes. *(Avance: `eval/preguntas.yaml` creado con 54 preguntas (28 dentro del dominio, 10 fuera, 6 sensibles, 5 ambiguas, 2 saludos y 3 de la demo); falta confirmar la cobertura cuando exista el seed, en T3.1.)*
+- [x] **T0.2** — Validar el dominio: ampliar las preguntas de la [3.5](#35-preguntas-de-referencia-base-del-set-de-evaluación) a 40+ y confirmar que el material del *seed* las cubre. ✔ `eval/preguntas.yaml` inicial y lista de fuentes. *(Hecho: `eval/preguntas.yaml` con 54 preguntas (28 dentro del dominio, 13 a rechazar, 6 sensibles, 5 ambiguas y 2 saludos; 3 de las de rechazo son de la demo) y `docs/fuentes.md` con las fuentes verificadas. La cobertura de las preguntas se confirma al armar el seed, en T3.1.)*
 - [x] **T0.3** — Instalar **Node.js LTS**, **Ollama**, **Python 3.12** vía `uv` y (opcional) **GitHub CLI**; verificar Docker Desktop. ✔ `node -v`, `ollama -v`, `uv python list` y `docker ps` funcionan. *(Hecho en el portátil de Pablo: Node 24.19, Ollama 0.34.3, Python 3.12.14, gh 2.101, Docker 29.7.)*
 - [x] **T0.4** — Crear el repositorio **`cantinero`** en GitHub (público), `git init`, `.gitignore` (Python, Node, `.env`, `.venv`, `node_modules`, `data/uploads`, `trabajo agente.pdf`), README mínimo, este AGENTS.md y `docs/bitacora.md`. ✔ Primer commit subido. *(Hecho: https://github.com/pgil766/cantinero, público, rama `main`.)*
 - [x] **T0.5** — Activar **Azure for Students** con el correo institucional (puede tardar; hacerlo ya). ✔ Suscripción activa con crédito. *(Hecho: cuenta de Pablo con USD 100 de crédito. Cuidar el gasto: apagar la VM cuando no se use y configurar el auto-shutdown.)*
-- [ ] **T0.6** — `ollama pull qwen2.5:3b` y `ollama pull llama3.1:8b` (este último solo para comparar); prueba rápida en español. ✔ Ambos responden en local.
+- [x] **T0.6** — `ollama pull qwen2.5:3b` y `ollama pull llama3.1:8b` (este último solo para comparar); prueba rápida en español. ✔ Ambos responden en local. *(Hecho; resultados en la bitácora: sin RAG, qwen inventó la receta del Negroni.)*
 
 ### Fase 1 — Infraestructura local y esqueleto del backend
 
@@ -1160,7 +1160,7 @@ demo completa.
 
 ### Fase 3 — Ingesta y base vectorial (M5)
 
-- [ ] **T3.1** — Reunir el *seed* ([3.3](#33-base-de-conocimiento-inicial-seed)): recetas IBA en CSV (ml + oz), artículos de destilados y técnicas en MD, al menos un PDF y un DOCX. Preparar aparte `data/demo/guia_destilados_colombianos_viche.pdf`. ✔ 20–40 archivos, fuentes listadas en el README y ninguna mención del viche en el *seed*.
+- [ ] **T3.1** — Reunir el *seed* ([3.3](#33-base-de-conocimiento-inicial-seed)): recetas IBA en CSV (ml + oz), artículos de destilados y técnicas en MD, al menos un PDF y un DOCX. Preparar aparte `data/demo/guia_destilados_colombianos_viche.pdf`. ✔ 20–40 archivos, fuentes listadas en el README (ver `docs/fuentes.md`), ninguna mención del viche en el *seed* y cada pregunta `responder` de `eval/preguntas.yaml` cubierta por algún documento (ajustar `debe_contener` a lo que dicen las fuentes).
 - [ ] **T3.2** — `services/ingestion/loaders.py`: PDF, TXT, MD, CSV y DOCX con metadatos. ✔ Pruebas con un archivo de cada tipo (`tests/fixtures/`).
 - [ ] **T3.3** — `splitter.py`: una receta por fragmento (CSV por fila, MD por encabezado) y `RecursiveCharacterTextSplitter` para texto largo. ✔ Prueba: ninguna receta queda partida y no hay fragmentos vacíos.
 - [ ] **T3.4** — `vectorstore/store.py`: insertar fragmentos, borrar por `document_id` y buscar con filtro "global + propios" y puntaje normalizado. ✔ Prueba de ida y vuelta: insertar → buscar → borrar.
