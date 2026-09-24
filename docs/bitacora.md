@@ -102,7 +102,7 @@ Resultado: 23 pruebas en verde (antes 17). Para aplicar el cambio de roles se re
 - **Causa:** el plugin de Warp para Claude Code ejecuta scripts `.sh` en cada evento (por ejemplo, después de
   cada herramienta). En Windows, `.sh` está asociado a `sh_auto_file`, sin programa, así que cada ejecución
   abre ese diálogo. En este equipo el plugin tampoco funciona.
-- **Solución:** pendiente de decisión (desactivar el plugin o asociar `.sh` a Git Bash). No afecta al proyecto.
+- **Solución:** se desinstaló el plugin (`/plugin uninstall warp@claude-code-warp`). No afecta al proyecto.
 
 ## 2026-09-23 · Problema y decisión · Smart App Control bloquea Sentence Transformers → embeddings de Ollama (D13)
 
@@ -113,31 +113,87 @@ Resultado: 23 pruebas en verde (antes 17). Para aplicar el cambio de roles se re
   Linux (Docker y la VM) no ocurre.
 - **Opciones evaluadas:** (1) embeddings servidos por Ollama; (2) correr el backend siempre en Docker;
   (3) apagar Smart App Control, descartado porque Windows no permite volver a activarlo.
-- **Decisión (D13):** **embeddings de Ollama** con `paraphrase-multilingual` (768 dimensiones), que es el modelo
-  `paraphrase-multilingual-mpnet-base-v2` de Sentence Transformers servido por Ollama. El Anexo D del enunciado
-  lo contempla ("Sentence Transformers o embeddings de Ollama").
+- **Decisión (D13):** **embeddings de Ollama**. El Anexo D del enunciado lo contempla ("Sentence Transformers o
+  embeddings de Ollama"). Primero se eligió `paraphrase-multilingual` y luego `bge-m3` (ver la entrada siguiente).
 - **Ventajas adicionales:** un solo servicio (Ollama) sirve LLM y embeddings; el backend deja de necesitar
   PyTorch: la imagen pasó de varios GB (estimado con torch CPU) a **~80 MB** y el backend usa menos RAM.
-- **Verificación semántica:** para "¿Qué lleva un Negroni?", la similitud con un texto del Negroni fue **0.57**,
-  y con textos de mezcal y sushi, **0.24 y 0.27**. Separa bien lo relevante.
-- **Cambios:** migración `002_embedding_dim_768.sql` (VECTOR(384) → VECTOR(768)). `OLLAMA_KEEP_ALIVE` pasó a
-  segundos enteros (1800), porque `OllamaEmbeddings` no acepta el formato `"30m"` (`ChatOllama` sí).
+- **Otros cambios:** `OLLAMA_KEEP_ALIVE` pasó a segundos enteros (1800), porque `OllamaEmbeddings` no acepta el
+  formato `"30m"` (`ChatOllama` sí).
+
+## 2026-09-23 · Problema y decisión · `paraphrase-multilingual` ignora el final de cada fragmento → `bge-m3`
+
+- **Qué pasó:** al diseñar el *chunking* (fragmentos de ~900 caracteres) se sospechó que el modelo de embeddings
+  tenía un límite de lectura: `ollama ps` mostraba `CONTEXT 128`.
+- **Experimento:** una frase relevante ("El Negroni se prepara con gin, vermut rojo y Campari...") se colocó al
+  **inicio** y al **final** de textos cada vez más largos, y se midió su similitud con "¿Qué lleva un Negroni?":
+
+  | Largo del texto | `paraphrase-multilingual`: relevante al inicio / al final | `bge-m3`: al inicio / al final |
+  |-----------------|------------------------------------------------------------|--------------------------------|
+  | ~70 caracteres | 0.525 / 0.525 | 0.570 / 0.570 |
+  | ~330 | 0.489 / 0.370 | 0.509 / 0.432 |
+  | ~590 | 0.493 / **0.175** | 0.483 / 0.398 |
+  | ~1100 | 0.493 / **0.175** | 0.474 / 0.370 |
+  | ~2200 | 0.493 / **0.175** | 0.480 / 0.388 |
+
+  Con `paraphrase-multilingual`, a partir de ~500 caracteres la frase del final **deja de verse** (0.175 es el
+  nivel del texto de relleno): el modelo trunca a 128 tokens sin avisar. Con fragmentos de 900 caracteres, la
+  mitad de cada fragmento sería invisible para la búsqueda (por ejemplo, la cristalería o la preparación de una
+  receta). La revisión independiente de la Fase 2 llegó a la misma conclusión por su cuenta: dos textos que
+  solo diferían al final daban una similitud de **1.000000**.
+- **Comparación de separación** (misma pregunta contra 5 textos):
+
+  | Pregunta | `paraphrase-multilingual` | `bge-m3` |
+  |----------|---------------------------|----------|
+  | "¿Qué lleva un Negroni?" | Negroni 0.48 · Americano 0.40 · resto 0.23–0.25 | Negroni 0.56 · Americano 0.47 · resto 0.25–0.31 |
+  | "¿Qué vino marida con el salmón?" | primero **sushi** (0.42) | primero **vino** (0.45) |
+  | "¿Cuál es la capital de Francia?" | −0.14 a 0.11 | 0.19 a 0.26 |
+
+- **Decisión:** **`bge-m3`** (1024 dimensiones, contexto de 8192 tokens; Ollama lo corre con 4096). Es
+  multilingüe, lee el fragmento completo y ordena mejor por significado. También está publicado en Hugging Face
+  (`BAAI/bge-m3`) y es compatible con Sentence Transformers, así que encaja con las dos opciones del Anexo D.
+- **Costo:** 1.2 GB en disco, 0.7 GB en memoria con GPU y 1.2 GB en CPU; la VM de 8 GB sigue alcanzando.
+  Migración `003_embedding_dim_1024.sql`.
+- **Consecuencia para el umbral (T5.4):** con `bge-m3` hasta una pregunta totalmente ajena obtiene 0.19–0.26, y
+  "¿qué vino marida con el salmón?" obtiene 0.44 contra textos de cócteles. El umbral no alcanza por sí solo para
+  rechazar preguntas cercanas pero fuera del alcance: el nodo validador (`grade_context`) es indispensable.
+- **Prueba de regresión:** `test_embeddings_read_the_whole_chunk_not_only_its_beginning` falla con
+  `paraphrase-multilingual` (similitud 1.0) y pasa con `bge-m3`.
+
+## 2026-09-23 · Revisión · Revisión independiente de la Fase 2 (10 hallazgos)
+
+| # | Sev. | Hallazgo | Corrección |
+|---|------|----------|-----------|
+| 1 | Alta | Embeddings truncados a 128 tokens: se ignoraba la mitad de cada fragmento | Cambio a `bge-m3` (entrada anterior) y prueba de regresión |
+| 2 | Media | `LLM_TIMEOUT_SECONDS` no limitaba la respuesta: con *streaming* cada token reinicia el reloj (una respuesta de 2179 tokens terminó en 38.8 s con timeout de 2 s) y no había tope de tokens | `LocalChatModel` llama **sin streaming** (el timeout cubre la respuesta completa); `LLM_NUM_PREDICT=512` y `LLM_JSON_NUM_PREDICT=128` |
+| 3 | Media | `embed_documents` enviaba todo el documento en una sola petición | `LocalEmbeddings` envía lotes (`EMBEDDING_BATCH_SIZE`) con su propio `EMBEDDING_TIMEOUT_SECONDS` |
+| 4 | Media | La traducción a 503 solo existía en funciones auxiliares; un nodo de LangGraph que llamara `llm.invoke` directamente devolvería 500 | Traducción dentro de las clases (`LocalChatModel`, `LocalEmbeddings`) y *exception handlers* globales como red de seguridad |
+| 5 | Media | En la VM el backend apuntaría a `host.docker.internal` y no esperaría a Ollama | `OLLAMA_BASE_URL_DOCKER` documentada para la VM y `depends_on: ollama (service_healthy, required: false)` |
+| 6 | Baja | El *entrypoint* de Ollama no reenviaba SIGTERM (`docker stop` terminaba en SIGKILL) | `trap` que reenvía la señal |
+| 7 | Baja | Un modelo o una URL vacíos en compose fallaban recién en la primera pregunta, con un 500 | `min_length=1`: falla al arrancar |
+| 8 | Baja | La fila "solo CPU" de la T2.5 medía los embeddings en GPU | `smoke_models --cpu` también fuerza los embeddings a CPU; mediciones repetidas |
+| 9 | Baja | Pruebas débiles (la "prueba de español" solo verificaba que se repitiera una palabra; no se probaban el timeout, los lotes, el 404 real ni el truncamiento) | Pruebas nuevas; 46 en total |
+| 10 | Baja | `ollama` y `httpx` se importaban sin estar declarados | Declarados en `requirements.in` |
 
 ## 2026-09-23 · Nota · Mediciones del modelo local (T2.5)
 
-Medido con `python -m scripts.smoke_models` (pregunta corta; portátil **conectado a corriente**):
+Medido con `python -m scripts.smoke_models` (portátil **conectado a corriente**). La indexación usa 64
+fragmentos de ~900 caracteres. En modo "solo CPU" (`--cpu`), el LLM **y** los embeddings corren con `num_gpu=0`.
 
-| Escenario | LLM en frío | LLM en caliente | Velocidad | Embedding | RAM del modelo |
-|-----------|-------------|-----------------|-----------|-----------|----------------|
-| Nativo, **GPU** RTX 3050 6 GB | 1.5 s | 1.1 s | — | 0.01–0.05 s | qwen 2.2 GB (100% en GPU) |
-| Nativo, **solo CPU** (Ryzen 7 7445HS, 12 hilos; `num_gpu=0`) | 14.9 s | 4.2 s | **11.4 tokens/s** | 0.05 s | qwen 2.2 GB (en RAM) |
-| Backend **en Docker** → Ollama nativo (`host.docker.internal`) | 4.1 s | 5.1 s | — | 0.04–0.09 s | — |
+| Escenario | LLM en frío | LLM en caliente | Velocidad LLM | Embedding de consulta | Indexación | Memoria |
+|-----------|-------------|-----------------|---------------|-----------------------|------------|---------|
+| Nativo, **GPU** RTX 3050 6 GB | 1.2 s | 0.9 s | **58 tokens/s** | 0.02 s | **32 ms/fragmento** | qwen 2.2 GB + bge-m3 0.7 GB (en GPU) |
+| Nativo, **solo CPU** (Ryzen 7 7445HS, 12 hilos) | 14.4 s | 3.5 s | **10 tokens/s** | 0.04 s (7.4 s si hay que cargar el modelo) | **427 ms/fragmento** | qwen 2.2 GB + bge-m3 1.2 GB (en RAM) |
+| Backend **en Docker** → Ollama nativo (`host.docker.internal`) | — | ~4–5 s | — | 0.04–0.09 s | — | — |
 
 - La primera medición del proyecto (116 s) estaba muy deprimida: el portátil estaba con batería y descargando
   `llama3.1:8b` a la vez.
-- **Implicación para la VM (Fase 8):** la VM no tiene GPU. Con 2 vCPU se esperan 3–4 veces menos tokens/s que
-  con los 12 hilos del portátil y, con el contexto largo del RAG, 40–70 s por respuesta. Probablemente convenga
-  una VM de **4 vCPU**; decidirlo midiendo en la Fase 8.
+- **Implicaciones para la VM (Fase 8):** la VM no tiene GPU. Con 2 vCPU se espera de 3 a 6 veces menos
+  velocidad que con los 12 hilos del portátil:
+  - respuestas del agente con el contexto largo del RAG: **40–70 s** o más → probablemente convenga una VM de
+    **4 vCPU**; decidirlo midiendo en la Fase 8;
+  - indexación: 1.3–2.6 s por fragmento → por eso los lotes son de 16 con 120 s de margen
+    (`EMBEDDING_BATCH_SIZE`, `EMBEDDING_TIMEOUT_SECONDS`). Para el seed conviene **indexar en el portátil (GPU)**
+    y llevar la base a la VM con `pg_dump`/`pg_restore` (T8.6).
 
 ## 2026-09-23 · Nota · Python 3.12 para el proyecto
 
