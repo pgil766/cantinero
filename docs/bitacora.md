@@ -104,6 +104,41 @@ Resultado: 23 pruebas en verde (antes 17). Para aplicar el cambio de roles se re
   abre ese diálogo. En este equipo el plugin tampoco funciona.
 - **Solución:** pendiente de decisión (desactivar el plugin o asociar `.sh` a Git Bash). No afecta al proyecto.
 
+## 2026-09-23 · Problema y decisión · Smart App Control bloquea Sentence Transformers → embeddings de Ollama (D13)
+
+- **Qué pasó:** al importar `sentence_transformers` en el portátil apareció
+  `ImportError: DLL load failed ... Una directiva de Control de aplicaciones bloqueó este archivo`.
+- **Causa:** *Smart App Control* de Windows 11 bloquea binarios sin firma o sin reputación. Bloqueó un
+  módulo compilado de `scikit-learn`, dependencia de `sentence-transformers`. No es un problema del código; en
+  Linux (Docker y la VM) no ocurre.
+- **Opciones evaluadas:** (1) embeddings servidos por Ollama; (2) correr el backend siempre en Docker;
+  (3) apagar Smart App Control, descartado porque Windows no permite volver a activarlo.
+- **Decisión (D13):** **embeddings de Ollama** con `paraphrase-multilingual` (768 dimensiones), que es el modelo
+  `paraphrase-multilingual-mpnet-base-v2` de Sentence Transformers servido por Ollama. El Anexo D del enunciado
+  lo contempla ("Sentence Transformers o embeddings de Ollama").
+- **Ventajas adicionales:** un solo servicio (Ollama) sirve LLM y embeddings; el backend deja de necesitar
+  PyTorch: la imagen pasó de varios GB (estimado con torch CPU) a **~80 MB** y el backend usa menos RAM.
+- **Verificación semántica:** para "¿Qué lleva un Negroni?", la similitud con un texto del Negroni fue **0.57**,
+  y con textos de mezcal y sushi, **0.24 y 0.27**. Separa bien lo relevante.
+- **Cambios:** migración `002_embedding_dim_768.sql` (VECTOR(384) → VECTOR(768)). `OLLAMA_KEEP_ALIVE` pasó a
+  segundos enteros (1800), porque `OllamaEmbeddings` no acepta el formato `"30m"` (`ChatOllama` sí).
+
+## 2026-09-23 · Nota · Mediciones del modelo local (T2.5)
+
+Medido con `python -m scripts.smoke_models` (pregunta corta; portátil **conectado a corriente**):
+
+| Escenario | LLM en frío | LLM en caliente | Velocidad | Embedding | RAM del modelo |
+|-----------|-------------|-----------------|-----------|-----------|----------------|
+| Nativo, **GPU** RTX 3050 6 GB | 1.5 s | 1.1 s | — | 0.01–0.05 s | qwen 2.2 GB (100% en GPU) |
+| Nativo, **solo CPU** (Ryzen 7 7445HS, 12 hilos; `num_gpu=0`) | 14.9 s | 4.2 s | **11.4 tokens/s** | 0.05 s | qwen 2.2 GB (en RAM) |
+| Backend **en Docker** → Ollama nativo (`host.docker.internal`) | 4.1 s | 5.1 s | — | 0.04–0.09 s | — |
+
+- La primera medición del proyecto (116 s) estaba muy deprimida: el portátil estaba con batería y descargando
+  `llama3.1:8b` a la vez.
+- **Implicación para la VM (Fase 8):** la VM no tiene GPU. Con 2 vCPU se esperan 3–4 veces menos tokens/s que
+  con los 12 hilos del portátil y, con el contexto largo del RAG, 40–70 s por respuesta. Probablemente convenga
+  una VM de **4 vCPU**; decidirlo midiendo en la Fase 8.
+
 ## 2026-09-23 · Nota · Python 3.12 para el proyecto
 
 - El equipo tiene Python 3.13 instalado, pero se usa **Python 3.12** (vía `uv`) en local y en Docker para evitar

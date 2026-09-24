@@ -66,7 +66,7 @@ Estas reglas aplican a cualquier agente de IA (Claude Code, Codex, Cursor, etc.)
    Make, Flowise, Botpress visual, Langflow o similares). El agente se construye **con código**, con
    LangChain y LangGraph. Violarlo reprueba el trabajo.
 6. **Prohibido** usar como LLM del agente un modelo comercial en la nube (OpenAI, Anthropic, Gemini, etc.).
-   El LLM y los embeddings corren **localmente** (Ollama y Sentence Transformers).
+   El LLM y los embeddings corren **localmente**, ambos servidos por **Ollama**.
 7. **Secretos.** Nunca subas `.env`, llaves, *tokens*, contraseñas ni el *client secret* de Keycloak al
    repositorio. Solo `.env.example` con valores de ejemplo. Antes de cada commit, revisa `git status` y
    `git diff --staged`.
@@ -158,6 +158,7 @@ backend y reutilízala.
 | D10 | Ubicación del repositorio | ✅ `C:\Users\pgilm\Universidad\Implementacion\trabajo_agentes` (**fuera de OneDrive**) | GitHub es el respaldo |
 | D11 | Fechas | ✅ **Sin cronograma** | Plan por fases y prioridades |
 | D12 | Formatos multimedia (JPG, JPEG, MP3, MP4) | ✅ **Opcionales** (Fase 10) | Solo cuando M1–M8 estén listos y desplegados |
+| D13 | Embeddings | ✅ **Ollama con `paraphrase-multilingual`** (768 dim), en lugar de Sentence Transformers | *Smart App Control* de Windows bloquea binarios de `scikit-learn` (dependencia de Sentence Transformers). El Anexo D admite "embeddings de Ollama". Un solo servicio (Ollama) sirve el LLM y los embeddings, y el backend no necesita PyTorch (imagen de ~80 MB) |
 
 ---
 
@@ -424,7 +425,7 @@ Mínimo **dos** estrategias. Cantinero implementa **las seis** (ver [sección 9]
 | Backend | **FastAPI** (Python **3.12**) | Recomendado en el Anexo D; mismo lenguaje que LangChain y LangGraph; OpenAPI automático |
 | Agente | **LangGraph** + **LangChain** (`langchain-core`, `langchain-ollama`, `langchain-postgres`, `langchain-text-splitters`, `langchain-community`) | Obligatorio (§3.1) |
 | LLM local | **Ollama** + **`qwen2.5:3b`** | Qwen está en la lista del docente (§3.2); buen español; ~2 GB de RAM, cabe en la VM |
-| Embeddings | **Sentence Transformers**: `paraphrase-multilingual-MiniLM-L12-v2` (384 dim) | Recomendado en el Anexo D; multilingüe (dominio en español); liviano en CPU |
+| Embeddings | **Ollama** con `paraphrase-multilingual` (768 dim; el modelo `paraphrase-multilingual-mpnet-base-v2` de Sentence Transformers servido por Ollama) | Anexo D ("embeddings de Ollama"); multilingüe (dominio en español); ver D13 |
 | Base vectorial y datos | **PostgreSQL 17 + pgvector 0.8.6** (imagen `pgvector/pgvector:0.8.6-pg17`) | Anexo D; un solo motor para vectores, historial, documentos y Keycloak |
 | Autenticación | **Keycloak** (imagen oficial `quay.io/keycloak/keycloak`) | Recomendado por el docente (§2.1 y Anexo D); OIDC estándar |
 | Frontend | **React + Vite + TypeScript** + Tailwind CSS + `keycloak-js` | Anexo D (React); rápido de construir |
@@ -451,11 +452,10 @@ VM), menor capacidad de razonamiento que un modelo de 8B y fallos ocasionales al
 con parseo defensivo).
 
 > ⚠️ **Regla crítica de embeddings:** el **mismo modelo** debe usarse para indexar y para consultar. La
-> dimensión queda fija en la columna `vector(384)`. **Cambiar el modelo de embeddings obliga a reindexar
+> dimensión queda fija en la columna `vector(768)` (migración 002; `scripts.migrate` lo verifica). **Cambiar el modelo de embeddings obliga a reindexar
 > todo** (`scripts/reindex.py`).
 
-> ⚠️ Instala **PyTorch solo CPU** en la imagen Docker del backend (índice
-> `https://download.pytorch.org/whl/cpu`); si no, la imagen pesa varios GB extra por CUDA.
+> ℹ️ El backend **no** usa PyTorch ni `sentence-transformers` (ver D13): los embeddings se piden a Ollama.
 
 ---
 
@@ -481,7 +481,7 @@ flowchart TD
             SVC --> ING[Ingesta<br/>extraer → chunk → embed → guardar]
             SVC --> AG[Agente LangGraph]
             AG --> RET[Retriever pgvector<br/>umbral + filtro por usuario]
-            ING --> EMB[Sentence Transformers<br/>embeddings locales]
+            ING --> EMB[Ollama<br/>paraphrase-multilingual]
             RET --> EMB
         end
 
@@ -679,7 +679,8 @@ Criterio del **10%** y de los requisitos mínimos M6 y M7. Se implementan las **
 - Procedimiento: correr el set de evaluación, registrar la similitud máxima de las preguntas **dentro** y
   **fuera** del dominio, y fijar el umbral entre ambas distribuciones. Documenta la tabla o gráfica en el
   documento técnico (sección 10).
-- Valor inicial orientativo para MiniLM multilingüe: 0.35–0.50. **No lo des por bueno sin medir.**
+- Referencia medida con `paraphrase-multilingual` (Fase 2): pregunta vs. texto relevante ≈ 0.57; vs. textos no
+  relacionados ≈ 0.24–0.27. Valor inicial orientativo: 0.40–0.50. **No lo des por bueno sin medir.**
 - Caso difícil del dominio: preguntas cercanas pero fuera del alcance ("¿qué vino marida con salmón?")
   pueden tener similitud moderada con textos de destilados. El validador (capa 2) es quien las debe atajar.
 
@@ -740,7 +741,7 @@ CREATE TABLE chunks (
   chunk_index   INT NOT NULL,
   content       TEXT NOT NULL,                                             -- RT-VDB-1
   metadata      JSONB NOT NULL DEFAULT '{}',  -- página, nombre del cóctel, sección, etc.
-  embedding     VECTOR(384) NOT NULL
+  embedding     VECTOR(768) NOT NULL          -- 384 en 001; 768 desde la migración 002 (D13)
 );
 CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX ON chunks (document_id);
@@ -1036,8 +1037,9 @@ Todas deben aparecer en `.env.example` (sin valores reales) y documentarse en el
 | `LLM_MODEL` | `qwen2.5:3b` | Modelo (D7) |
 | `LLM_TEMPERATURE` | `0.1` | Baja, para respuestas factuales |
 | `LLM_TIMEOUT_SECONDS` | `120` | Tiempo máximo por respuesta en CPU |
-| `EMBEDDING_MODEL` | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | — |
-| `EMBEDDING_DIM` | `384` | Debe coincidir con `vector(384)` |
+| `EMBEDDING_MODEL` | `paraphrase-multilingual` | Modelo de embeddings en Ollama (D13) |
+| `EMBEDDING_DIM` | `768` | Debe coincidir con `vector(768)`; `scripts.migrate` falla si no coincide |
+| `OLLAMA_KEEP_ALIVE` | `1800` | Segundos que Ollama mantiene los modelos cargados (entero: `OllamaEmbeddings` no acepta `30m`) |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `900` / `150` | Fragmentación de texto largo |
 | `RETRIEVAL_TOP_K` | `5` | Fragmentos recuperados |
 | `SIMILARITY_THRESHOLD` | `0.45` | **Calibrado** en T5.4 |
@@ -1080,8 +1082,13 @@ docente) permite correr todo el `docker-compose` junto. **Registrar esta justifi
 | Red (NSG) | Entrantes: **443** y **80** (Caddy); **22** solo desde las IP del equipo |
 | Ahorro | **Auto-shutdown** diario configurado y apagar la VM cuando no se use (el crédito es limitado) |
 
-**Consumo de RAM estimado:** Ollama con `qwen2.5:3b` ≈ 2.5 GB · Keycloak ≈ 1 GB · backend con
-embeddings ≈ 1 GB · Postgres ≈ 0.3 GB · Caddy y SO ≈ 1 GB → **≈ 6 GB**; cabe en 8 GB con margen.
+**Consumo de RAM estimado:** Ollama con `qwen2.5:3b` + `paraphrase-multilingual` ≈ 2.8 GB · Keycloak ≈ 1 GB ·
+backend ≈ 0.3 GB · Postgres ≈ 0.3 GB · Caddy y SO ≈ 1 GB → **≈ 5.5 GB**; cabe en 8 GB con margen.
+
+> ⚠️ **El cuello de botella es la CPU, no la RAM** (medido en la Fase 2): `qwen2.5:3b` solo con CPU genera
+> 11.4 tokens/s en un Ryzen 7 de 12 hilos (≈ 4 s por respuesta corta). Con 2 vCPU se espera 3–4 veces menos
+> y, con el contexto largo del RAG, **40–70 s por respuesta**. Evaluar una VM de **4 vCPU** (por ejemplo,
+> `D4as_v5` o `B4ms`) en la Fase 8, midiendo con `python -m scripts.smoke_models` y el set de evaluación.
 
 > ⚠️ Las VM serie **B** son *burstable*: la inferencia sostenida en CPU consume "créditos de CPU" y, al
 > agotarse, la VM se ralentiza. Si la latencia se vuelve inaceptable, cambiar a una serie **D** (por
@@ -1092,7 +1099,7 @@ embeddings ≈ 1 GB · Postgres ≈ 0.3 GB · Caddy y SO ≈ 1 GB → **≈ 6 GB
 | Servicio | Imagen | Expuesto a internet | Volumen |
 |----------|--------|---------------------|---------|
 | `caddy` | `caddy` | **Sí** (80/443) | certificados |
-| `backend` | propia (`backend/Dockerfile`) | No (vía Caddy `/api`) | caché de modelos de embeddings |
+| `backend` | propia (`backend/Dockerfile`) | No (vía Caddy `/api`) | — |
 | `keycloak` | `quay.io/keycloak/keycloak` | No (vía Caddy `/auth`) | — (estado en Postgres) |
 | `postgres` | `pgvector/pgvector:0.8.6-pg17` | **No** | **`pgdata` (persistente)** |
 | `ollama` | `ollama/ollama` | **No** | **`ollama_models` (persistente)** |
@@ -1154,11 +1161,11 @@ demo completa.
 
 ### Fase 2 — Modelo local y embeddings (M4)
 
-- [ ] **T2.1** — `vectorstore/embeddings.py` con Sentence Transformers (modelo por variable de entorno). ✔ Prueba: la dimensión es igual a `EMBEDDING_DIM` (384).
-- [ ] **T2.2** — Fábrica del LLM (`ChatOllama` con `base_url`, `model`, `temperature` y *timeout*). ✔ Prueba de humo que responde en español.
-- [ ] **T2.3** — Ollama caído → excepción de dominio → HTTP 503. ✔ Prueba con Ollama apagado.
-- [ ] **T2.4** — Servicio `ollama` en compose (volumen de modelos y *pull* de `qwen2.5:3b`). En local, documentar la alternativa de Ollama nativo en Windows (usa la GPU). ✔ El backend en Docker responde usando Ollama.
-- [ ] **T2.5** — Bitácora: RAM y latencia de `qwen2.5:3b` en CPU y en GPU.
+- [x] **T2.1** — `vectorstore/embeddings.py` con embeddings de **Ollama** (`paraphrase-multilingual`, modelo por variable de entorno; ver D13). ✔ Prueba: la dimensión es igual a `EMBEDDING_DIM` (768). *(Hecho: `build_embeddings`, `embed_query` y `embed_documents`; prueba real `test_embedding_dimension_matches_settings`.)*
+- [x] **T2.2** — Fábrica del LLM (`ChatOllama` con `base_url`, `model`, `temperature` y *timeout*). ✔ Prueba de humo que responde en español. *(Hecho: `app/agents/llm.py` con `build_chat_model` (y `json_mode`) e `invoke_llm`; `scripts/smoke_models.py` responde en español.)*
+- [x] **T2.3** — Ollama caído → excepción de dominio → HTTP 503. ✔ Prueba con Ollama apagado. *(Hecho: `app/core/ollama.py` traduce conexión rechazada, tiempo agotado y modelo inexistente a `ModelUnavailableError` → 503 `model_unavailable`; 8 pruebas, incluida una con Ollama apagado.)*
+- [x] **T2.4** — Servicio `ollama` en compose (volumen de modelos y *pull* de `qwen2.5:3b`). En local, documentar la alternativa de Ollama nativo en Windows (usa la GPU). ✔ El backend en Docker responde usando Ollama. *(Hecho: servicio `ollama` (imagen 0.34.3) con perfil `ollama` y `ollama/entrypoint.sh`, que descarga el LLM y los embeddings una sola vez; probado con un volumen temporal. En local, el backend en Docker usa el Ollama nativo por `host.docker.internal` (verificado con `smoke_models` dentro del contenedor).)*
+- [x] **T2.5** — Bitácora: RAM y latencia de `qwen2.5:3b` en CPU y en GPU. *(Hecho: ver la bitácora del 2026-09-23 "Mediciones del modelo local".)*
 
 ### Fase 3 — Ingesta y base vectorial (M5)
 
@@ -1403,6 +1410,7 @@ La demo **debe cubrir** cada punto de §5.3. Guion sugerido:
 | R10 | RAM insuficiente (Keycloak + Ollama + backend) | Media | Alta | Estimación de ≈ 6 GB en 8 GB; limitar la memoria de la JVM de Keycloak; monitorear con `docker stats` |
 | R11 | Créditos de Azure agotados antes de la sustentación | Media | **Crítico** | *Auto-shutdown*, apagar la VM cuando no se use y revisar el consumo en el portal |
 | R12 | Incompatibilidades de Python 3.13 con torch o langchain | Media | Media | **Python 3.12** en local (`uv`) y en el Dockerfile |
+| R16 | *Smart App Control* de Windows bloquea binarios de Python sin firma (pasó con `scikit-learn`) | Media | Media | Preferir dependencias puras o firmadas; si algo se bloquea, correr esa parte en Docker. **No** apagar Smart App Control (no se puede volver a activar) |
 | R13 | Cambiar el modelo de embeddings a mitad del proyecto | Media | Alta | Decidirlo en la Fase 2; `reindex.py` |
 | R14 | Filtración entre usuarios en la búsqueda | Baja | Alta | Filtro en SQL, no en Python; `test_isolation.py` |
 | R15 | Secretos subidos por error al repositorio | Media | Alta | `.gitignore` desde el primer commit y revisar `git diff --staged`; si ocurre, rotar la llave inmediatamente |
@@ -1420,9 +1428,9 @@ La demo **debe cubrir** cada punto de §5.3. Guion sugerido:
 | uv | ✅ 0.12.5 | Gestor de entornos del backend |
 | Git | ✅ 2.55 | — |
 | Docker Desktop | ✅ 29.7 | Verificar que el *engine* esté corriendo |
-| Node.js / npm | ❌ **No instalado** | Instalar Node.js LTS |
-| Ollama | ❌ **No instalado** | Instalar Ollama para Windows |
-| GitHub CLI | ❌ No instalado | Opcional |
+| Node.js / npm | ✅ 24.19 / 11.17 | — |
+| Ollama | ✅ 0.34.3 (nativo, usa la GPU) | Modelos: `qwen2.5:3b`, `llama3.1:8b`, `paraphrase-multilingual` |
+| GitHub CLI | ✅ 2.101 | — |
 | GPU | ✅ NVIDIA RTX 3050 **6 GB** | Ollama nativo la usa (útil para comparar con `llama3.1:8b`) |
 | RAM | 15.2 GB | Suficiente |
 | Carpeta del proyecto | ✅ `C:\Users\pgilm\Universidad\Implementacion\trabajo_agentes` (fuera de OneDrive) | — |
