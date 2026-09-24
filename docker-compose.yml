@@ -91,15 +91,19 @@ services:
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080${KC_HTTP_RELATIVE_PATH}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE}
-      # En local, Ollama corre nativo en Windows (usa la GPU); en la VM, el override de producción
-      # lo cambia por el servicio "ollama".
+      # Local: Ollama nativo en Windows (usa la GPU) → host.docker.internal (valor por defecto).
+      # VM: en el .env poner OLLAMA_BASE_URL_DOCKER=http://ollama:11434 y levantar con --profile ollama.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_DOCKER:-http://host.docker.internal:11434}
       LLM_MODEL: ${LLM_MODEL}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE}
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS}
+      LLM_NUM_PREDICT: ${LLM_NUM_PREDICT}
+      LLM_JSON_NUM_PREDICT: ${LLM_JSON_NUM_PREDICT}
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       EMBEDDING_DIM: ${EMBEDDING_DIM}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE}
+      EMBEDDING_TIMEOUT_SECONDS: ${EMBEDDING_TIMEOUT_SECONDS}
       CHUNK_SIZE: ${CHUNK_SIZE}
       CHUNK_OVERLAP: ${CHUNK_OVERLAP}
       RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K}
@@ -113,6 +117,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      # Solo aplica con --profile ollama (VM): el backend no arranca hasta que Ollama descargó los modelos.
+      ollama:
+        condition: service_healthy
+        required: false
 
 volumes:
   pgdata:

@@ -5,6 +5,10 @@ set -euo pipefail
 ollama serve &
 server_pid=$!
 
+# bash corre como PID 1 y no reenvía señales por sí solo: sin esto, "docker stop" terminaría
+# matando a Ollama con SIGKILL (sin cierre limpio, incluso a mitad de una descarga).
+trap 'kill -TERM "$server_pid" 2>/dev/null; wait "$server_pid"; exit 0' TERM INT
+
 until ollama list >/dev/null 2>&1; do sleep 1; done
 
 for model in "$LLM_MODEL" "$EMBEDDING_MODEL"; do
