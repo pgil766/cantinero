@@ -15,8 +15,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${APP_DB_NAME}
-      # Leídas por db/init/01-init.sh para crear la BD y el usuario de Keycloak
+      # Leídas por db/init/01-init.sh
       APP_DB_NAME: ${APP_DB_NAME}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
       KC_DB_NAME: ${KC_DB_NAME}
       KC_DB_USER: ${KC_DB_USER}
       KC_DB_PASSWORD: ${KC_DB_PASSWORD}
@@ -26,7 +28,9 @@ services:
     ports:
       - "127.0.0.1:5432:5432"   # solo accesible desde el propio equipo
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${APP_DB_NAME}"]
+      # -h 127.0.0.1: durante el init el servidor temporal solo escucha por socket, así que
+      # el chequeo por TCP no da "sano" hasta que el init terminó y Postgres arrancó de verdad.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER} -d ${APP_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -40,7 +44,7 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/${KC_DB_NAME}
       KC_DB_USERNAME: ${KC_DB_USER}
       KC_DB_PASSWORD: ${KC_DB_PASSWORD}
-      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HTTP_RELATIVE_PATH: ${KC_HTTP_RELATIVE_PATH}
       KC_HEALTH_ENABLED: "true"
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
@@ -53,10 +57,34 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
-    env_file: .env
+    # Solo las variables que el backend necesita (§15.2). No se usa env_file: así el contenedor
+    # no recibe las contraseñas de superusuario de Postgres ni las de Keycloak.
     environment:
-      # Dentro de Docker, Postgres se alcanza por el nombre del servicio, no por localhost
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${APP_DB_NAME}
+      APP_ENV: ${APP_ENV}
+      LOG_LEVEL: ${LOG_LEVEL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      # Dentro de Docker los servicios se alcanzan por su nombre, no por localhost/127.0.0.1
+      DATABASE_URL: postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${APP_DB_NAME}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080${KC_HTTP_RELATIVE_PATH}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE}
+      # En local, Ollama corre nativo en Windows (usa la GPU); en la VM, el override de producción
+      # lo cambia por el servicio "ollama".
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_DOCKER:-http://host.docker.internal:11434}
+      LLM_MODEL: ${LLM_MODEL}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      EMBEDDING_DIM: ${EMBEDDING_DIM}
+      CHUNK_SIZE: ${CHUNK_SIZE}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP}
+      RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K}
+      SIMILARITY_THRESHOLD: ${SIMILARITY_THRESHOLD}
+      CHAT_HISTORY_TURNS: ${CHAT_HISTORY_TURNS}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # necesario en Linux; en Docker Desktop ya existe
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
