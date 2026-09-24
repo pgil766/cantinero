@@ -165,5 +165,6 @@ def _read_text(path: Path) -> str:
 
 def _clean(text: str) -> str:
     text = text.replace("\x00", "").replace("\r\n", "\n").replace("\r", "\n")
-    text = "\n".join(line.rstrip() for line in text.split("\n"))
+    # Espacios repetidos (texto justificado de los PDF: "Métodos  de  preparación") → uno solo.
+    text = "\n".join(re.sub(r"[ \t ]{2,}", " ", line).rstrip() for line in text.split("\n"))
     return re.sub(r"\n{3,}", "\n\n", text).strip()

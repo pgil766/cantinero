@@ -54,10 +54,17 @@ class VectorStore:
 
     # --- Escritura (dentro de la transacción de la ingesta) -------------------------------------
 
-    def add_chunks(self, conn: Connection, document_id: UUID | str, chunks: list[Chunk]) -> int:
+    def embed_chunks(self, chunks: list[Chunk]) -> list[list[float]]:
+        """Calcula los embeddings (lo lento). Se llama FUERA de la transacción de la BD."""
+        return self.embeddings.embed_documents([c.content for c in chunks]) if chunks else []
+
+    def add_chunks(self, conn: Connection, document_id: UUID | str, chunks: list[Chunk],
+                   vectors: list[list[float]] | None = None) -> int:
+        """Inserta los fragmentos con sus embeddings (si no se pasan, los calcula)."""
         if not chunks:
             return 0
-        vectors = self.embeddings.embed_documents([c.content for c in chunks])
+        if vectors is None:
+            vectors = self.embed_chunks(chunks)
         conn.execute(
             text(
                 "INSERT INTO chunks (document_id, chunk_index, content, metadata, embedding) "
