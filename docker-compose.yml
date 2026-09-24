@@ -54,6 +54,28 @@ services:
       postgres:
         condition: service_healthy
 
+  # LLM y embeddings. Perfil "ollama": en local NO se levanta por defecto porque Ollama corre nativo en
+  # Windows (usa la GPU). En la VM se levanta con:  docker compose --profile ollama up -d
+  ollama:
+    image: ollama/ollama:0.34.3
+    profiles: ["ollama"]
+    restart: unless-stopped
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    environment:
+      LLM_MODEL: ${LLM_MODEL}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE}
+    volumes:
+      - ollama_models:/root/.ollama
+      - ./ollama/entrypoint.sh:/entrypoint.sh:ro
+    healthcheck:
+      # Sano solo cuando ya descargó los dos modelos
+      test: ["CMD-SHELL", "ollama list | grep -q \"$${LLM_MODEL}\" && ollama list | grep -q \"$${EMBEDDING_MODEL}\""]
+      interval: 15s
+      timeout: 10s
+      retries: 80
+      start_period: 30s
+
   backend:
     build: ./backend
     restart: unless-stopped
@@ -75,6 +97,7 @@ services:
       LLM_MODEL: ${LLM_MODEL}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE}
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       EMBEDDING_DIM: ${EMBEDDING_DIM}
       CHUNK_SIZE: ${CHUNK_SIZE}
@@ -93,3 +116,4 @@ services:
 
 volumes:
   pgdata:
+  ollama_models:
