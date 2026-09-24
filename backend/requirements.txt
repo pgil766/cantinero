@@ -22,6 +22,8 @@ click==8.5.0
     # via uvicorn
 distro==1.9.0
     # via langsmith
+docx2txt==0.9
+    # via -r requirements.in
 fastapi==0.141.1
     # via -r requirements.in
 greenlet==3.5.6 ; platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64'
@@ -60,10 +62,13 @@ langchain-core==1.6.4
     # via
     #   -r requirements.in
     #   langchain-ollama
+    #   langchain-text-splitters
 langchain-ollama==1.1.0
     # via -r requirements.in
 langchain-protocol==0.0.19
     # via langchain-core
+langchain-text-splitters==1.1.2
+    # via -r requirements.in
 langsmith==0.14.0
     # via langchain-core
 ollama==0.6.2
@@ -93,10 +98,14 @@ pydantic-core==2.46.5
     # via pydantic
 pydantic-settings==2.15.0
     # via -r requirements.in
+pypdf==6.19.0
+    # via -r requirements.in
 python-dotenv==1.2.3
     # via
     #   pydantic-settings
     #   uvicorn
+python-multipart==0.0.32
+    # via -r requirements.in
 pyyaml==6.0.3
     # via
     #   langchain-core

@@ -18,3 +18,10 @@ langchain-ollama
 # dependencias de langchain-ollama no deje de capturar sus excepciones sin avisar.
 ollama
 httpx
+
+# Fase 3: extracción de texto y fragmentación. Librerías en Python puro (sin binarios), para que
+# Smart App Control de Windows no las bloquee (ver docs/bitacora.md).
+pypdf
+docx2txt
+langchain-text-splitters
+python-multipart
