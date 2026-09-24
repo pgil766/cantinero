@@ -26,7 +26,8 @@ def test_missing_required_variables_are_listed_in_a_clear_message():
 def test_defaults_match_the_agreed_stack():
     s = make_settings()
     assert s.llm_model == "qwen2.5:3b"
-    assert s.embedding_dim == 384
+    assert s.embedding_dim == 768
+    assert s.embedding_model == "paraphrase-multilingual"
     assert s.keycloak_realm == "cantinero"
     assert s.keycloak_audience == "cantinero-api"
 

@@ -33,14 +33,17 @@ class Settings(BaseSettings):
     keycloak_audience: str = "cantinero-api"
 
     # --- Modelo local ---
-    ollama_base_url: str = "http://localhost:11434"
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    # Segundos que Ollama mantiene los modelos cargados en memoria tras usarlos (evita recargas lentas).
+    # Entero: OllamaEmbeddings no acepta el formato "30m" (ChatOllama sí).
+    ollama_keep_alive: int = Field(1800, ge=0)
     llm_model: str = "qwen2.5:3b"
     llm_temperature: float = Field(0.1, ge=0.0, le=2.0)
     llm_timeout_seconds: int = Field(120, gt=0)
 
-    # --- Embeddings y RAG ---
-    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    embedding_dim: int = Field(384, gt=0)
+    # --- Embeddings y RAG (servidos por Ollama) ---
+    embedding_model: str = "paraphrase-multilingual"
+    embedding_dim: int = Field(768, gt=0)
     chunk_size: int = Field(900, gt=0)
     chunk_overlap: int = Field(150, ge=0)
     retrieval_top_k: int = Field(5, gt=0)

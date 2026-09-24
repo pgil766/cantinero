@@ -30,16 +30,33 @@ uv pip sync requirements.txt requirements-dev.txt
 .\.venv\Scripts\python.exe -m pytest -m "not integration"   # sin base de datos
 ```
 
-Las pruebas de integración crean y borran una BD temporal `cantinero_test`; se omiten si PostgreSQL no está disponible.
+- Marcador `integration`: crean y borran una BD temporal `cantinero_test`; se omiten si PostgreSQL no está disponible.
+- Marcador `ollama`: usan Ollama real con los modelos del `.env`; se omiten si Ollama no responde.
+
+## Modelo local (Ollama)
+
+El LLM (`qwen2.5:3b`) y los embeddings (`paraphrase-multilingual`) los sirve Ollama. En local corre nativo en
+Windows (usa la GPU):
+
+```powershell
+ollama pull qwen2.5:3b
+ollama pull paraphrase-multilingual
+.\.venv\Scripts\python.exe -m scripts.smoke_models          # responde, mide latencia y memoria
+.\.venv\Scripts\python.exe -m scripts.smoke_models --cpu    # fuerza CPU: aproxima la VM sin GPU
+```
+
+En la VM, Ollama corre en Docker: `docker compose --profile ollama up -d` (descarga ambos modelos la primera vez).
 
 ## Dependencias
 
 Las directas se declaran en `requirements.in` / `requirements-dev.in` y se fijan con:
 
 ```powershell
-uv pip compile requirements.in -o requirements.txt --python-version 3.12
-uv pip compile requirements-dev.in -o requirements-dev.txt --python-version 3.12
+uv pip compile requirements.in -o requirements.txt --python-version 3.12 --universal
+uv pip compile requirements-dev.in -o requirements-dev.txt --python-version 3.12 --universal
 ```
+
+`--universal` resuelve para Windows (desarrollo) y Linux (Docker/VM) a la vez.
 
 ## Docker
 

@@ -1,6 +1,6 @@
 # Dependencias directas del backend. Las versiones exactas se fijan en requirements.txt con:
-#   uv pip compile requirements.in -o requirements.txt --python-version 3.12
-# (se irán agregando las de LangChain/LangGraph, embeddings, loaders y Keycloak en sus fases)
+#   uv pip compile requirements.in -o requirements.txt --python-version 3.12 --universal
+# --universal: resuelve para Windows (desarrollo) y Linux (Docker/VM) a la vez.
 
 fastapi
 uvicorn[standard]
@@ -8,3 +8,9 @@ pydantic-settings
 sqlalchemy
 psycopg[binary]
 pgvector
+
+# Fase 2: LLM y embeddings, ambos servidos por Ollama (Anexo D: "embeddings de Ollama").
+# No se usa sentence-transformers: Smart App Control de Windows bloquea binarios de scikit-learn
+# (ver docs/bitacora.md), y así el backend no necesita PyTorch.
+langchain-core
+langchain-ollama
