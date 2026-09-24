@@ -10,6 +10,7 @@ from app.controllers import health
 from app.core.config import Settings, get_settings
 from app.core.errors import UnhandledErrorMiddleware, register_exception_handlers
 from app.core.logging import configure_logging
+from app.core.ollama import register_ollama_exception_handlers
 
 API_PREFIX = "/api/v1"
 
@@ -39,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["Authorization", "Content-Type"],
     )
     register_exception_handlers(app)
+    register_ollama_exception_handlers(app)
 
     # /health queda fuera de /api/v1: es la única ruta pública (excepción justificada, T4.9).
     app.include_router(health.router)

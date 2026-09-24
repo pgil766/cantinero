@@ -10,8 +10,10 @@ from contextlib import contextmanager
 
 import httpx
 import ollama
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
-from app.core.errors import AppError
+from app.core.errors import AppError, error_response
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,22 @@ def ollama_errors(model: str) -> Iterator[None]:
         raise ModelUnavailableError(
             "No se pudo conectar con el modelo local. Intenta de nuevo en un momento."
         ) from exc
+
+
+def register_ollama_exception_handlers(app: FastAPI) -> None:
+    """Red de seguridad: si un error de Ollama escapa sin traducir (por ejemplo, desde una librería que
+    llama al cliente por su cuenta), igual llega al cliente como 503 y no como 500."""
+
+    async def _to_503(_: Request, exc: Exception) -> JSONResponse:
+        logger.error("Error de Ollama no traducido: %r", exc)
+        try:
+            with ollama_errors("desconocido"):
+                raise exc
+        except ModelUnavailableError as translated:
+            return error_response(503, translated.detail, translated.code)
+
+    for exc_type in (ollama.ResponseError, httpx.TransportError, ConnectionError):
+        app.add_exception_handler(exc_type, _to_503)
 
 
 def missing_models(base_url: str, models: list[str], timeout: float = 5.0) -> list[str]:

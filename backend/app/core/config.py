@@ -33,17 +33,26 @@ class Settings(BaseSettings):
     keycloak_audience: str = "cantinero-api"
 
     # --- Modelo local ---
-    ollama_base_url: str = "http://127.0.0.1:11434"
+    # min_length=1: una variable vacía en compose ("") debe fallar al arrancar, no en la primera pregunta.
+    ollama_base_url: str = Field("http://127.0.0.1:11434", min_length=1)
     # Segundos que Ollama mantiene los modelos cargados en memoria tras usarlos (evita recargas lentas).
     # Entero: OllamaEmbeddings no acepta el formato "30m" (ChatOllama sí).
     ollama_keep_alive: int = Field(1800, ge=0)
-    llm_model: str = "qwen2.5:3b"
+    llm_model: str = Field("qwen2.5:3b", min_length=1)
     llm_temperature: float = Field(0.1, ge=0.0, le=2.0)
+    # Tiempo máximo de la respuesta COMPLETA (el modelo se llama sin streaming).
     llm_timeout_seconds: int = Field(120, gt=0)
+    # Tope de tokens por respuesta: evita respuestas desbocadas que ocupen Ollama por minutos.
+    llm_num_predict: int = Field(512, gt=0)
+    llm_json_num_predict: int = Field(128, gt=0)  # clasificador y validadores: respuestas cortas
 
     # --- Embeddings y RAG (servidos por Ollama) ---
-    embedding_model: str = "paraphrase-multilingual"
-    embedding_dim: int = Field(768, gt=0)
+    # bge-m3: multilingüe y lee fragmentos largos (8192 tokens). paraphrase-multilingual solo leía
+    # ~500 caracteres e ignoraba el resto (ver docs/bitacora.md).
+    embedding_model: str = Field("bge-m3", min_length=1)
+    embedding_dim: int = Field(1024, gt=0)
+    embedding_batch_size: int = Field(16, gt=0)
+    embedding_timeout_seconds: int = Field(120, gt=0)  # por lote (en CPU, ~0.4 s o más por fragmento)
     chunk_size: int = Field(900, gt=0)
     chunk_overlap: int = Field(150, ge=0)
     retrieval_top_k: int = Field(5, gt=0)

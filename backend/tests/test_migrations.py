@@ -74,7 +74,7 @@ def test_app_role_is_not_superuser(db):
 
 
 def test_migrations_create_schema_and_are_idempotent(db):
-    assert db.first_run == ["001_init", "002_embedding_dim_768"]
+    assert db.first_run == ["001_init", "002_embedding_dim_768", "003_embedding_dim_1024"]
     assert apply_migrations(db.engine) == []  # la segunda vez no hace nada
 
     with db.engine.connect() as conn:
@@ -100,9 +100,9 @@ def test_percent_signs_in_migrations_are_kept_literally(db, tmp_path):
 
 
 def test_embedding_dim_is_verified_against_the_column(db):
-    verify_embedding_dim(db.engine, 768)
-    with pytest.raises(EmbeddingDimMismatch, match="VECTOR\\(768\\)"):
-        verify_embedding_dim(db.engine, 384)  # dimensión del modelo anterior: debe fallar
+    verify_embedding_dim(db.engine, 1024)
+    with pytest.raises(EmbeddingDimMismatch, match="VECTOR\\(1024\\)"):
+        verify_embedding_dim(db.engine, 768)  # dimensión del modelo anterior: debe fallar
 
 
 def _insert_document(conn, *, is_global: bool, owner_id: str | None, sha: str = "abc", status: str = "ready"):
@@ -152,7 +152,7 @@ def test_deleting_a_document_deletes_its_chunks(db):
                 "INSERT INTO chunks (document_id, chunk_index, content, embedding) "
                 "VALUES (:d, 0, 'Negroni', :e)"
             ),
-            {"d": doc_id, "e": "[" + ",".join(["0.1"] * 768) + "]"},
+            {"d": doc_id, "e": "[" + ",".join(["0.1"] * 1024) + "]"},
         )
         conn.execute(text("DELETE FROM documents WHERE id = :d"), {"d": doc_id})
         remaining = conn.execute(

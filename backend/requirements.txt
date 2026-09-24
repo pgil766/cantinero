@@ -39,6 +39,7 @@ httptools==0.8.0
     # via uvicorn
 httpx==0.28.1
     # via
+    #   -r requirements.in
     #   langchain-core
     #   ollama
 httpx2==2.13.1
@@ -66,7 +67,9 @@ langchain-protocol==0.0.19
 langsmith==0.14.0
     # via langchain-core
 ollama==0.6.2
-    # via langchain-ollama
+    # via
+    #   -r requirements.in
+    #   langchain-ollama
 orjson==3.12.0 ; platform_python_implementation != 'PyPy'
     # via langsmith
 packaging==26.3

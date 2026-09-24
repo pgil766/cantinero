@@ -14,3 +14,7 @@ pgvector
 # (ver docs/bitacora.md), y así el backend no necesita PyTorch.
 langchain-core
 langchain-ollama
+# Se importan directamente (traducción de errores a 503): se declaran para que un cambio en las
+# dependencias de langchain-ollama no deje de capturar sus excepciones sin avisar.
+ollama
+httpx
