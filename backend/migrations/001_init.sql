@@ -21,8 +21,10 @@ CREATE TABLE documents (
   CHECK ((is_global AND owner_id IS NULL) OR (NOT is_global AND owner_id IS NOT NULL))
 );
 
--- Evita subir dos veces el mismo archivo por usuario (y en el seed).
-CREATE UNIQUE INDEX uq_documents_owner_sha ON documents (COALESCE(owner_id, 'GLOBAL'), sha256);
+-- Evita subir dos veces el mismo archivo por usuario (y en el seed). Los documentos con
+-- status 'failed' no cuentan, para que el usuario pueda reintentar la subida.
+CREATE UNIQUE INDEX uq_documents_owner_sha ON documents (COALESCE(owner_id, 'GLOBAL'), sha256)
+  WHERE status <> 'failed';
 CREATE INDEX ix_documents_owner ON documents (owner_id);
 
 -- Fragmentos con su embedding (dimensión = EMBEDDING_DIM).

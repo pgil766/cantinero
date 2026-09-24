@@ -43,6 +43,21 @@ def test_unhandled_error_returns_500_without_leaking_details(settings):
     assert "secreto" not in body["detail"]
 
 
+def test_unhandled_error_keeps_cors_headers_so_the_frontend_can_read_it():
+    app = create_app(make_settings(cors_origins="http://localhost:5173"))
+
+    @app.get("/boom")
+    def boom():
+        raise RuntimeError("falla")
+
+    response = TestClient(app, raise_server_exceptions=False).get(
+        "/boom", headers={"Origin": "http://localhost:5173"}
+    )
+    assert response.status_code == 500
+    assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    assert response.json()["code"] == "internal_error"
+
+
 def test_validation_error_is_uniform_and_lists_fields(settings):
     app = create_app(settings)
 

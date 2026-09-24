@@ -3,7 +3,9 @@ import pytest
 from app.core.config import ConfigError, load_settings
 from tests.conftest import REQUIRED, make_settings
 
-ENV_VARS = [name.upper() for name in REQUIRED] + ["CHUNK_SIZE", "CHUNK_OVERLAP", "SIMILARITY_THRESHOLD"]
+ENV_VARS = [name.upper() for name in REQUIRED] + [
+    "APP_ENV", "CHUNK_SIZE", "CHUNK_OVERLAP", "SIMILARITY_THRESHOLD",
+]
 
 
 @pytest.fixture(autouse=True)
@@ -17,7 +19,7 @@ def test_missing_required_variables_are_listed_in_a_clear_message():
         load_settings(_env_file=None)
     message = str(exc.value)
     assert "Faltan variables de entorno obligatorias" in message
-    for name in ("DATABASE_URL", "KEYCLOAK_ISSUER", "KEYCLOAK_INTERNAL_URL"):
+    for name in ("APP_ENV", "DATABASE_URL", "KEYCLOAK_ISSUER", "KEYCLOAK_INTERNAL_URL"):
         assert name in message
 
 
@@ -32,9 +34,11 @@ def test_defaults_match_the_agreed_stack():
 def test_values_are_read_from_environment(monkeypatch):
     for key, value in REQUIRED.items():
         monkeypatch.setenv(key.upper(), value)
+    monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("SIMILARITY_THRESHOLD", "0.6")
     s = load_settings(_env_file=None)
     assert s.similarity_threshold == 0.6
+    assert s.is_production
 
 
 def test_cors_origins_are_split_by_comma():
@@ -44,9 +48,14 @@ def test_cors_origins_are_split_by_comma():
 
 def test_similarity_threshold_out_of_range_is_rejected():
     with pytest.raises(ConfigError, match="SIMILARITY_THRESHOLD"):
-        load_settings(_env_file=None, **REQUIRED, similarity_threshold=1.5)
+        load_settings(_env_file=None, **{**REQUIRED, "similarity_threshold": 1.5})
 
 
 def test_chunk_overlap_must_be_smaller_than_chunk_size():
     with pytest.raises(ConfigError, match="CHUNK_OVERLAP"):
-        load_settings(_env_file=None, **REQUIRED, chunk_size=100, chunk_overlap=100)
+        load_settings(_env_file=None, **{**REQUIRED, "chunk_size": 100, "chunk_overlap": 100})
+
+
+def test_unknown_app_env_is_rejected():
+    with pytest.raises(ConfigError, match="APP_ENV"):
+        load_settings(_env_file=None, **{**REQUIRED, "app_env": "prod"})

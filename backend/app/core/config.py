@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     )
 
     # --- Aplicación ---
-    app_env: Literal["development", "production", "test"] = "development"
+    # Obligatoria a propósito: si faltara y el valor por defecto fuera "development", /docs quedaría
+    # publicado en producción.
+    app_env: Literal["development", "production", "test"]
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:5173"
 

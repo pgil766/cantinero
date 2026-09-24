@@ -4,8 +4,9 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,22 @@ def error_response(status_code: int, detail: str, code: str | None = None, **ext
     return JSONResponse(status_code=status_code, content=body)
 
 
+class UnhandledErrorMiddleware(BaseHTTPMiddleware):
+    """Convierte cualquier excepción no controlada en un 500 uniforme.
+
+    Se registra ANTES que CORSMiddleware (queda por dentro de él). Un manejador para Exception
+    registrado con exception_handler correría en ServerErrorMiddleware, por fuera de CORS, y el
+    navegador recibiría el 500 sin cabeceras CORS: el frontend no podría leer el mensaje.
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        try:
+            return await call_next(request)
+        except Exception as exc:
+            logger.exception("Error no controlado en %s %s: %s", request.method, request.url.path, exc)
+            return error_response(500, "Ocurrió un error interno. Intenta de nuevo más tarde.")
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(_: Request, exc: AppError) -> JSONResponse:
@@ -58,8 +75,3 @@ def register_exception_handlers(app: FastAPI) -> None:
             for err in exc.errors()
         ]
         return error_response(422, "Los datos enviados no son válidos.", errors=errors)
-
-    @app.exception_handler(Exception)
-    async def _unhandled_error(_: Request, exc: Exception) -> JSONResponse:
-        logger.exception("Error no controlado: %s", exc)
-        return error_response(500, "Ocurrió un error interno. Intenta de nuevo más tarde.")

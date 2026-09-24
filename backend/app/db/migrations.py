@@ -34,9 +34,33 @@ def apply_migrations(engine: Engine, migrations_dir: Path = MIGRATIONS_DIR) -> l
         if version in already:
             continue
         with engine.begin() as conn:
-            conn.exec_driver_sql(path.read_text(encoding="utf-8"))
+            # Se ejecuta con el cursor de psycopg y SIN parámetros: así los "%" del SQL
+            # (LIKE '%x%', '40% vol.', RAISE ... %) llegan intactos. exec_driver_sql los
+            # interpretaría como marcadores de parámetro.
+            conn.connection.driver_connection.execute(path.read_text(encoding="utf-8"))
             conn.execute(text("INSERT INTO schema_migrations (version) VALUES (:v)"), {"v": version})
         logger.info("Migración aplicada: %s", version)
         applied_now.append(version)
 
     return applied_now
+
+
+class EmbeddingDimMismatch(RuntimeError):
+    pass
+
+
+def verify_embedding_dim(engine: Engine, expected_dim: int) -> None:
+    """Falla si EMBEDDING_DIM no coincide con la columna chunks.embedding (VECTOR(N))."""
+    with engine.connect() as conn:
+        actual = conn.execute(
+            text(
+                "SELECT atttypmod FROM pg_attribute "
+                "WHERE attrelid = 'chunks'::regclass AND attname = 'embedding'"
+            )
+        ).scalar_one()
+    if actual != expected_dim:
+        raise EmbeddingDimMismatch(
+            f"EMBEDDING_DIM={expected_dim} no coincide con la columna chunks.embedding VECTOR({actual}). "
+            "Si cambiaste el modelo de embeddings, crea una migración que cambie la dimensión y "
+            "reindexa todo con scripts/reindex.py."
+        )
