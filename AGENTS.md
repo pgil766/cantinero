@@ -731,7 +731,8 @@ CREATE TABLE documents (
   CHECK ((is_global AND owner_id IS NULL) OR (NOT is_global AND owner_id IS NOT NULL))
 );
 -- Evita duplicados por usuario (y en el seed)
-CREATE UNIQUE INDEX uq_documents_owner_sha ON documents (COALESCE(owner_id, 'GLOBAL'), sha256);
+CREATE UNIQUE INDEX uq_documents_owner_sha ON documents (COALESCE(owner_id, 'GLOBAL'), sha256)
+  WHERE status <> 'failed';   -- un documento fallido no bloquea reintentar la subida
 
 CREATE TABLE chunks (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1011,9 +1012,10 @@ Todas deben aparecer en `.env.example` (sin valores reales) y documentarse en el
 
 | Variable | Ejemplo | Descripción |
 |----------|---------|-------------|
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` | `cantinero` / `***` | Superusuario de Postgres |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` | `postgres_admin` / `***` | **Superusuario** de Postgres: solo lo usan el init y la administración, **nunca** el backend |
+| `APP_DB_USER` / `APP_DB_PASSWORD` | `cantinero_app` / `***` | Rol **sin privilegios** de la aplicación, dueño de la BD `cantinero` (lo crea `db/init/01-init.sh`) |
 | `APP_DB_NAME` | `cantinero` | BD de la aplicación |
-| `KC_DB_NAME` | `keycloak` | BD de Keycloak |
+| `KC_DB_NAME` / `KC_DB_USER` / `KC_DB_PASSWORD` | `keycloak` / `keycloak` / `***` | BD y rol de Keycloak |
 | `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD` | `admin` / `***` | Admin inicial de Keycloak (el nombre de la variable depende de la versión; verificar) |
 | `KC_HOSTNAME` | `https://cantinero.eastus.cloudapp.azure.com/auth` | URL pública de Keycloak |
 | `KC_HTTP_RELATIVE_PATH` | `/auth` | Ruta base de Keycloak |
@@ -1023,14 +1025,14 @@ Todas deben aparecer en `.env.example` (sin valores reales) y documentarse en el
 
 | Variable | Ejemplo | Descripción |
 |----------|---------|-------------|
-| `APP_ENV` | `development` / `production` | Controla `/docs`, logs, etc. |
+| `APP_ENV` | `development` / `production` / `test` | **Obligatoria** (sin valor por defecto): en `production` oculta `/docs` y `/openapi.json` |
 | `CORS_ORIGINS` | `http://localhost:5173,https://cantinero.vercel.app` | Orígenes permitidos |
-| `DATABASE_URL` | `postgresql+psycopg://cantinero:***@postgres:5432/cantinero` | BD de la aplicación |
+| `DATABASE_URL` | `postgresql+psycopg://cantinero_app:***@127.0.0.1:5432/cantinero` | BD de la aplicación con el rol sin privilegios. En Docker, compose la arma con el host `postgres`. Contraseñas solo alfanuméricas (van dentro de una URL) |
 | `KEYCLOAK_ISSUER` | `https://<dominio>/auth/realms/cantinero` | `iss` esperado (URL **pública**) |
-| `KEYCLOAK_INTERNAL_URL` | `http://keycloak:8080/auth` | Para descargar la JWKS por la red interna |
+| `KEYCLOAK_INTERNAL_URL` | `http://127.0.0.1:8080/auth` (nativo) · `http://keycloak:8080/auth` (Docker, fijado en compose) | Para descargar la JWKS |
 | `KEYCLOAK_REALM` | `cantinero` | *Realm* |
 | `KEYCLOAK_AUDIENCE` | `cantinero-api` | `aud` esperado |
-| `OLLAMA_BASE_URL` | `http://ollama:11434` (Docker) / `http://localhost:11434` (Ollama nativo en Windows) | URL de Ollama |
+| `OLLAMA_BASE_URL` / `OLLAMA_BASE_URL_DOCKER` | `http://127.0.0.1:11434` (backend nativo) · `http://host.docker.internal:11434` (backend en Docker con Ollama nativo, valor por defecto) · `http://ollama:11434` (VM) | URL de Ollama |
 | `LLM_MODEL` | `qwen2.5:3b` | Modelo (D7) |
 | `LLM_TEMPERATURE` | `0.1` | Baja, para respuestas factuales |
 | `LLM_TIMEOUT_SECONDS` | `120` | Tiempo máximo por respuesta en CPU |
@@ -1163,9 +1165,9 @@ demo completa.
 - [ ] **T3.1** — Reunir el *seed* ([3.3](#33-base-de-conocimiento-inicial-seed)): recetas IBA en CSV (ml + oz), artículos de destilados y técnicas en MD, al menos un PDF y un DOCX. Preparar aparte `data/demo/guia_destilados_colombianos_viche.pdf`. ✔ 20–40 archivos, fuentes listadas en el README (ver `docs/fuentes.md`), ninguna mención del viche en el *seed* y cada pregunta `responder` de `eval/preguntas.yaml` cubierta por algún documento (ajustar `debe_contener` a lo que dicen las fuentes).
 - [ ] **T3.2** — `services/ingestion/loaders.py`: PDF, TXT, MD, CSV y DOCX con metadatos. ✔ Pruebas con un archivo de cada tipo (`tests/fixtures/`).
 - [ ] **T3.3** — `splitter.py`: una receta por fragmento (CSV por fila, MD por encabezado) y `RecursiveCharacterTextSplitter` para texto largo. ✔ Prueba: ninguna receta queda partida y no hay fragmentos vacíos.
-- [ ] **T3.4** — `vectorstore/store.py`: insertar fragmentos, borrar por `document_id` y buscar con filtro "global + propios" y puntaje normalizado. ✔ Prueba de ida y vuelta: insertar → buscar → borrar.
+- [ ] **T3.4** — `vectorstore/store.py`: insertar fragmentos, borrar por `document_id` y buscar con filtro "global + propios" y puntaje normalizado. ✔ Prueba de ida y vuelta: insertar → buscar → borrar. ⚠️ Con el índice HNSW, pgvector filtra **después** de recorrer el índice (unos 40 candidatos con `hnsw.ef_search` por defecto): con el filtro por usuario puede devolver menos de `top_k`. Usar `SET LOCAL hnsw.iterative_scan = relaxed_order` (pgvector 0.8) dentro de la transacción de búsqueda y probarlo.
 - [ ] **T3.5** — `pipeline.py`: validar → extraer → dividir → *embed* → guardar (transacción) → actualizar `documents`. ✔ Un PDF real termina en `ready` con `chunk_count > 0`.
-- [ ] **T3.6** — Deduplicación por `sha256` por usuario. ✔ Subir el mismo archivo dos veces da 409.
+- [ ] **T3.6** — Deduplicación por `sha256` por usuario. ✔ Subir el mismo archivo dos veces da 409. Traducir `UniqueViolation` (dos subidas simultáneas) a 409, nunca a 500. Un documento en `failed` **no** bloquea el reintento (índice parcial `WHERE status <> 'failed'`): borrar la fila fallida al reintentar.
 - [ ] **T3.7** — `scripts/ingest_seed.py` (documentos globales) y `scripts/reindex.py`. ✔ Base poblada; conteo en el log.
 
 ### Fase 4 — Keycloak y API protegida (M2)
@@ -1177,7 +1179,7 @@ demo completa.
 - [ ] **T4.5** — Dependencia aplicada a **todos** los routers y `GET /auth/me`. ✔ Con *token* devuelve el usuario; sin *token*, 401.
 - [ ] **T4.6** — Endpoints de documentos con propiedad: subir (privado), listar (global + propios), detalle, borrar (403 global, 404 ajeno). ✔ Pruebas de API.
 - [ ] **T4.7** — Endpoints de conversaciones filtrados por usuario. ✔ Prueba: el usuario B no ve las conversaciones de A (404).
-- [ ] **T4.8** — **Pruebas de aislamiento y protección:** (a) todas las rutas de `app.routes` devuelven 401 sin *token*; (b) el usuario B **nunca** recibe fragmentos de documentos privados de A en `/chat`. ✔ Ambas en verde.
+- [ ] **T4.8** — **Pruebas de aislamiento y protección:** (a) todas las rutas de `app.routes` devuelven 401 sin *token*; (b) el usuario B **nunca** recibe fragmentos de documentos privados de A en `/chat`. ✔ Ambas en verde. Incluir en (b) un caso con muchos fragmentos privados de otro usuario muy parecidos a la pregunta, para verificar que igual llegan `top_k` fragmentos válidos (ver T3.4).
 - [ ] **T4.9** — Decidir y documentar el tratamiento de `/health` y `/docs` en producción. ✔ Nota en la bitácora.
 
 ### Fase 5 — Agente LangGraph (M3, M6, M7)

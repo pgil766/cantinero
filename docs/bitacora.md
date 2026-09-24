@@ -72,6 +72,38 @@ Pregunta: *"¿Qué ingredientes lleva un Negroni?"* (temperatura 0.1, sin contex
 - Migraciones: SQL versionado (`backend/migrations/NNN_*.sql`) con un aplicador propio de ~40 líneas en vez
   de Alembic. Es más simple, transparente y suficiente para el tamaño del proyecto.
 
+## 2026-09-23 · Revisión · Revisión independiente de la Fase 1 (13 hallazgos)
+
+Un revisor independiente (agente de IA sin el contexto de la implementación) revisó la Fase 1 y verificó cada
+hallazgo ejecutando código contra el entorno. Todos se corrigieron o quedaron anotados en la tarea donde aplican:
+
+| # | Sev. | Hallazgo | Corrección |
+|---|------|----------|-----------|
+| 1 | Media | El aplicador de migraciones interpretaba `%` como marcador de parámetro (`'40% vol.'` se guardaba alterado sin error) | Ejecutar el SQL con el cursor de psycopg sin parámetros; prueba con `%`, `LIKE` y `RAISE` |
+| 2 | Media | El contenedor del backend recibía todo el `.env` (contraseñas de admin de Keycloak y de superusuario) | El backend recibe solo sus variables (§15.2) en `environment:` |
+| 3 | Media | El backend se conectaba a Postgres como **superusuario** | Rol `cantinero_app` sin privilegios, dueño de la BD; pgvector lo crea el superusuario en el init |
+| 4 | Media | Los 500 salían sin cabeceras CORS (el frontend no podría leer el mensaje) | Middleware de errores por dentro de CORS; prueba que verifica la cabecera |
+| 5 | Media | En Docker, `OLLAMA_BASE_URL` y `KEYCLOAK_INTERNAL_URL` apuntaban al propio contenedor | `http://keycloak:8080/auth` y `host.docker.internal:11434` (verificado con conexiones reales) |
+| 6 | Baja | Las pruebas de migraciones dependían del orden de ejecución | El *fixture* aplica las migraciones |
+| 7 | Baja | Un documento `failed` bloquearía reintentar la misma subida | Índice único parcial `WHERE status <> 'failed'`; 409 ante `UniqueViolation` (T3.6) |
+| 8 | Baja | HNSW + filtro por usuario puede devolver menos de `top_k` | `hnsw.iterative_scan` (anotado en T3.4 y T4.8) |
+| 9 | Baja | Sin `APP_ENV`, `/docs` quedaba público | `APP_ENV` obligatoria |
+| 10 | Baja | Contraseñas con caracteres especiales rompían el init | Variables de psql (`:'pw'`); contraseñas alfanuméricas documentadas |
+| 11 | Baja | El healthcheck de Postgres daba "sano" durante el init | `pg_isready -h 127.0.0.1` |
+| 12 | Baja | `requirements.txt` se había resuelto solo para Windows (faltaba `uvloop` para Linux) | `uv pip compile --universal` |
+| 13 | Baja | Imagen de Python sin versión exacta, variables faltantes en `.env.example`, dimensión del vector sin validar | `python:3.12.14-slim`, variables agregadas, `verify_embedding_dim` en `scripts.migrate` |
+
+Resultado: 23 pruebas en verde (antes 17). Para aplicar el cambio de roles se recreó el volumen de desarrollo
+(estaba vacío: 0 documentos, solo el realm `master`).
+
+## 2026-09-23 · Problema · Ventanas "Elegir una aplicación" en Windows
+
+- **Qué pasó:** aparecían muchas ventanas "Elegir una aplicación" (12 en un momento), de a varias a la vez.
+- **Causa:** el plugin de Warp para Claude Code ejecuta scripts `.sh` en cada evento (por ejemplo, después de
+  cada herramienta). En Windows, `.sh` está asociado a `sh_auto_file`, sin programa, así que cada ejecución
+  abre ese diálogo. En este equipo el plugin tampoco funciona.
+- **Solución:** pendiente de decisión (desactivar el plugin o asociar `.sh` a Git Bash). No afecta al proyecto.
+
 ## 2026-09-23 · Nota · Python 3.12 para el proyecto
 
 - El equipo tiene Python 3.13 instalado, pero se usa **Python 3.12** (vía `uv`) en local y en Docker para evitar
