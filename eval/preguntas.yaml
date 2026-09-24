@@ -1,7 +1,8 @@
 # Set de evaluación de Cantinero (AGENTS.md §18.2)
 #
 # esperado: responder | rechazar | aclarar | responsable | saludo
-# debe_contener: palabras clave que la respuesta debería incluir (sin distinguir mayúsculas).
+# debe_contener: palabras clave que la respuesta debería incluir (sin distinguir mayúsculas). Un elemento
+#   puede ser una lista de sinónimos: [["gin", "ginebra"], "Campari"] exige ("gin" o "ginebra") y "Campari".
 #   Son INICIALES: cuando exista el seed (T3.1) hay que ajustarlas a lo que dicen los documentos,
 #   porque el agente solo puede responder lo que está en su base de conocimiento.
 # historial: mensajes previos para probar preguntas de seguimiento.
@@ -14,7 +15,7 @@
 - id: in-001
   pregunta: "¿Qué lleva un Negroni?"
   esperado: responder
-  debe_contener: ["gin", "vermut", "Campari"]
+  debe_contener: [["gin", "ginebra"], ["vermut", "vermú"], "Campari"]
 - id: in-002
   pregunta: "¿Cómo se prepara un Mojito?"
   esperado: responder

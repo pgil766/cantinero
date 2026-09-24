@@ -195,6 +195,30 @@ fragmentos de ~900 caracteres. En modo "solo CPU" (`--cpu`), el LLM **y** los em
     (`EMBEDDING_BATCH_SIZE`, `EMBEDDING_TIMEOUT_SECONDS`). Para el seed conviene **indexar en el portátil (GPU)**
     y llevar la base a la VM con `pg_dump`/`pg_restore` (T8.6).
 
+## 2026-09-23 · Nota · Base de conocimiento inicial y primera prueba de recuperación (Fase 3)
+
+- **Seed:** 37 archivos (94 recetas IBA en CSV, 34 artículos de Wikipedia en Markdown, una guía en PDF y un
+  glosario en DOCX), armados por un subagente recopilador y **verificados de forma independiente** con los
+  extractores del proyecto: todos se leen sin errores, generan 785 fragmentos (máximo 1016 caracteres, media 593)
+  y ninguno menciona el viche (reservado para la demo). Se cargan en **22.7 s** con GPU (`scripts/ingest_seed.py`).
+- **Exclusiones del recopilador:** 7 recetas IBA con base de vino (fuera del alcance, §3.2) y el IBA Tiki (medidas
+  sin unidad en la fuente). Tres títulos de Wikipedia de la lista inicial eran otros artículos (Ginebra = la ciudad,
+  Refajo = la prenda, Pisco = desambiguación) y se corrigieron.
+- **Recuperación real** con `bge-m3` sobre las 54 preguntas de `eval/preguntas.yaml` (similitud del mejor fragmento):
+
+  | Tipo | Mín. | Media | Máx. | ¿Documento correcto en el primer puesto? |
+  |------|------|-------|------|------------------------------------------|
+  | Deben responderse (27) | 0.57 | 0.69 | 0.76 | **27 de 27** |
+  | Deben rechazarse (13) | 0.34 | 0.50 | 0.57 | — |
+  | Sensibles (6) | 0.47 | 0.53 | 0.59 | — |
+  | Ambiguas (5) | 0.41 | 0.50 | 0.62 | — |
+
+- **Conclusión para el umbral (T5.4):** las distribuciones se solapan cerca de 0.57 ("¿dónde comprar mezcal en
+  Bogotá?" y "¿de qué región es el viche?" puntúan como "¿qué lleva un Old Fashioned?"). El umbral puede filtrar lo
+  claramente ajeno (≤ 0.45: sushi, Mundial, ecuaciones), pero **el nodo validador del grafo es indispensable** para
+  las preguntas cercanas al dominio. Las sensibles también recuperan contexto (≈ 0.5): por eso se detectan en la
+  clasificación de intención, **antes** de buscar.
+
 ## 2026-09-23 · Nota · Python 3.12 para el proyecto
 
 - El equipo tiene Python 3.13 instalado, pero se usa **Python 3.12** (vía `uv`) en local y en Docker para evitar
